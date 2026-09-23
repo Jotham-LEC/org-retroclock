@@ -17,9 +17,11 @@ compile:
 	$(BATCH) --eval '(setq byte-compile-error-on-warn t)' -f batch-byte-compile $(PACKAGE).el test/$(PACKAGE)-test.el
 
 # checkdoc reports through the warnings buffer and exits zero regardless, so
-# read the buffer back and fail on anything in it.
+# read the buffer back and fail on anything in it.  Emacs 31 turned the verb
+# check off by default and 29 and 30 leave it on, so ask for it either way and
+# a local run says what CI will.
 checkdoc:
-	$(BATCH) --eval '(progn (checkdoc-file "$(PACKAGE).el") (let ((warnings (get-buffer "*Warnings*"))) (when warnings (princ (with-current-buffer warnings (buffer-string))) (kill-emacs 1))))'
+	$(BATCH) --eval '(progn (require (quote checkdoc)) (setq checkdoc-verb-check-experimental-flag t) (checkdoc-file "$(PACKAGE).el") (let ((warnings (get-buffer "*Warnings*"))) (when warnings (princ (with-current-buffer warnings (buffer-string))) (kill-emacs 1))))'
 
 package-lint:
 	$(BATCH) --eval '(require (quote package-lint))' -f package-lint-batch-and-exit $(PACKAGE).el
