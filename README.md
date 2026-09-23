@@ -83,6 +83,7 @@ started and no running clock is disturbed.
 It is a small package and a personal one. Bug reports and pull requests are welcome.
 
 ```sh
+make deps                # package-lint, into ./.deps
 make compile lint test   # byte-compile clean, checkdoc, package-lint, ERT
 ```
 
