@@ -56,6 +56,68 @@
                             (time-add org-retroclock-test--start (* 11 3600)))
     (should (string-suffix-p "=> 11:00" (org-retroclock-test--clock-line)))))
 
+(ert-deftest org-retroclock-insert-obeys-org-clock-into-drawer ()
+  (org-retroclock-test--with-entry
+    (let ((org-clock-into-drawer nil))
+      (org-retroclock--insert org-retroclock-test--start org-retroclock-test--end))
+    (should-not (string-match-p ":LOGBOOK:" (buffer-string))))
+  (org-retroclock-test--with-entry
+    (let ((org-clock-into-drawer "CLOCKING"))
+      (org-retroclock--insert org-retroclock-test--start org-retroclock-test--end))
+    (should (string-match-p ":CLOCKING:" (buffer-string)))))
+
+(ert-deftest org-retroclock-insert-goes-newest-first-in-an-existing-logbook ()
+  (org-retroclock-test--with-entry
+    (goto-char (point-max))
+    (insert ":LOGBOOK:\nCLOCK: [2026-09-01 Tue 08:00]--[2026-09-01 Tue 09:00] =>  1:00\n:END:\n")
+    (goto-char (point-min))
+    (org-retroclock--insert org-retroclock-test--start org-retroclock-test--end)
+    (should (string-match-p (concat "^:LOGBOOK:\n"
+                                    "CLOCK: \\[2026-09-24[^\n]*\n"
+                                    "CLOCK: \\[2026-09-01")
+                            (buffer-string)))
+    (goto-char (point-min))
+    (should (equal (org-clock-sum-current-item) 150))))
+
+(ert-deftest org-retroclock-insert-lands-after-a-properties-drawer ()
+  (org-retroclock-test--with-entry
+    (goto-char (point-max))
+    (insert "SCHEDULED: <2026-09-24 Thu>\n:PROPERTIES:\n:ID: x\n:END:\nbody\n")
+    (goto-char (point-min))
+    (org-retroclock--insert org-retroclock-test--start org-retroclock-test--end)
+    (should (string-match-p ":PROPERTIES:\n:ID: x\n:END:\n:LOGBOOK:\nCLOCK:" (buffer-string)))
+    (goto-char (point-min))
+    (should (equal (org-clock-sum-current-item) 90))))
+
+(ert-deftest org-retroclock-insert-clocks-the-entry-not-its-children ()
+  (org-retroclock-test--with-entry
+    (goto-char (point-max))
+    (insert "** Child\n")
+    (goto-char (point-min))
+    (org-retroclock--insert org-retroclock-test--start org-retroclock-test--end)
+    (goto-char (point-min))
+    (re-search-forward "^\\*\\* Child")
+    (should (equal (org-clock-sum-current-item) 0))))
+
+(ert-deftest org-retroclock-insert-handles-a-span-past-a-day ()
+  (org-retroclock-test--with-entry
+    (org-retroclock--insert org-retroclock-test--start
+                            (time-add org-retroclock-test--start (* 30 3600)))
+    (should (equal (org-retroclock-test--clock-line)
+                   "CLOCK: [2026-09-24 Thu 09:00]--[2026-09-25 Fri 15:00] => 30:00"))
+    (goto-char (point-min))
+    (should (equal (org-clock-sum-current-item) 1800))))
+
+(ert-deftest org-retroclock-insert-refuses-to-work-before-the-first-heading ()
+  (let ((system-time-locale "C"))
+    (with-temp-buffer
+      (org-mode)
+      (insert "Preamble, no heading yet.\n")
+      (goto-char (point-min))
+      (should-error (org-retroclock--insert org-retroclock-test--start
+                                            org-retroclock-test--end)
+                    :type 'user-error))))
+
 (ert-deftest org-retroclock-push-history-is-customisable ()
   (org-retroclock-test--with-entry
     (let ((org-retroclock-push-history nil))
