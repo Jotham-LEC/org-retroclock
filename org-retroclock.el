@@ -113,18 +113,25 @@ of more than a day has to be confirmed."
 (defun org-retroclock--read-times (anchored)
   "Return the cons (START . END) of a span read from the minibuffer.
 When ANCHORED is nil the span is a duration ending now.  Otherwise ask
-which end to pin, read that time, and read the duration from there."
-  (if (not anchored)
-      (let* ((minutes (org-retroclock--read-duration))
-             (end (current-time)))
-        (cons (time-subtract end (seconds-to-time (* minutes 60))) end))
-    (pcase (read-char-choice "Anchor: [s]tart time  [e]nd time: " '(?s ?e))
-      (?s (let* ((start (org-read-date t t nil "Start time"))
-                 (minutes (org-retroclock--read-duration)))
-            (cons start (time-add start (seconds-to-time (* minutes 60))))))
-      (?e (let* ((end (org-read-date t t nil "End time"))
-                 (minutes (org-retroclock--read-duration)))
-            (cons (time-subtract end (seconds-to-time (* minutes 60))) end))))))
+which end to pin, read that time, and read the duration from there.
+A span that ends more than a minute from now is refused: this logs work
+already done."
+  (let ((span
+         (if (not anchored)
+             (let* ((minutes (org-retroclock--read-duration))
+                    (end (current-time)))
+               (cons (time-subtract end (seconds-to-time (* minutes 60))) end))
+           (pcase (read-char-choice "Anchor: [s]tart time  [e]nd time: " '(?s ?e))
+             (?s (let* ((start (org-read-date t t nil "Start time"))
+                        (minutes (org-retroclock--read-duration)))
+                   (cons start (time-add start (seconds-to-time (* minutes 60))))))
+             (?e (let* ((end (org-read-date t t nil "End time"))
+                        (minutes (org-retroclock--read-duration)))
+                   (cons (time-subtract end (seconds-to-time (* minutes 60))) end)))))))
+    (when (time-less-p (time-add (org-current-time) 60) (cdr span))
+      (user-error "That span ends in the future, at %s"
+                  (format-time-string (org-time-stamp-format t t) (cdr span))))
+    span))
 
 ;;;###autoload
 (defun org-retroclock (arg)

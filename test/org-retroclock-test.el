@@ -217,5 +217,27 @@ asked and CONFIRM is the symbol `never'."
   (should-error (org-retroclock-test--read-duration "0.5" 'never) :type 'user-error)
   (should (= (org-retroclock-test--read-duration "1" 'never) 1)))
 
+(defun org-retroclock-test--read-anchored (anchor time duration)
+  "Return `org-retroclock--read-times' for ANCHOR (?s or ?e) at TIME.
+DURATION is the string typed at the duration prompt."
+  (cl-letf (((symbol-function 'read-char-choice) (lambda (&rest _) anchor))
+            ((symbol-function 'org-read-date) (lambda (&rest _) time))
+            ((symbol-function 'read-string) (lambda (&rest _) duration)))
+    (org-retroclock--read-times t)))
+
+(ert-deftest org-retroclock-refuses-an-end-in-the-future ()
+  (should-error (org-retroclock-test--read-anchored
+                 ?e (time-add (current-time) 3600) "30")
+                :type 'user-error)
+  (should-error (org-retroclock-test--read-anchored
+                 ?s (time-subtract (current-time) 1800) "90")
+                :type 'user-error))
+
+(ert-deftest org-retroclock-allows-an-end-within-a-minute-of-now ()
+  (should (org-retroclock-test--read-anchored
+           ?e (time-add (current-time) 30) "30"))
+  (should (org-retroclock-test--read-anchored
+           ?s (time-subtract (current-time) 5400) "90")))
+
 (provide 'org-retroclock-test)
 ;;; org-retroclock-test.el ends here
