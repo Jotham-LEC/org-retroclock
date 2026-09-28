@@ -36,16 +36,20 @@
 ;;
 ;; `org-retroclock' acts on the entry at point.  `org-retroclock-recent'
 ;; offers the picker `org-clock-in' uses for recently clocked tasks, so the
-;; entry need not be on screen, or even in a buffer you have open.
+;; entry need not be on screen, or even in a buffer you have open.  The
+;; picker reads `org-clock-history', which Org forgets when Emacs exits
+;; unless `org-clock-persist' is set.
 ;;
-;; Both read a duration ("90" or "1:30") ending now.  With a prefix
-;; argument they first ask which end of the span you want to pin, then read
-;; that time and the duration, so an hour you spent this morning and a
-;; meeting that ends at six are equally easy to say.
+;; Both read a duration ("90", "90m", "1h30m" or "1:30") ending now.  A
+;; trailing "m" means minutes, not Org's months.  With a prefix argument
+;; they first ask which end of the span you want to pin, then read that
+;; time and the duration, so an hour you spent this morning and a meeting
+;; that ended at six are equally easy to say.  A span under a minute or
+;; ending in the future is refused, and one over a day asks first.
 ;;
 ;; No keys are bound.  Bind the two commands wherever your Org keys live:
 ;;
-;;     (keymap-set org-mode-map "C-c C-x C-p" #'org-retroclock)
+;;     (keymap-set org-mode-map "C-c C-x h" #'org-retroclock)
 ;;     (keymap-global-set "C-c o p" #'org-retroclock-recent)
 
 ;;; Code:

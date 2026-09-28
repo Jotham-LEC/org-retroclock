@@ -12,6 +12,13 @@ clock-out, and [org-clock-convenience](https://github.com/dfeich/org-clock-conve
 corrects `CLOCK:` lines that already exist. org-retroclock writes the line that was
 never there.
 
+You can get there without it, and I did for a while. Clocking in starts a live clock:
+it clocks out whatever is running, and you still have to fix the start time and clock
+out at the right moment. Typing the line by hand works too, since `C-c C-c` on a
+`CLOCK:` line fills in the total, but you open the drawer yourself, type two timestamps
+in exactly Org's format, and put them where Org expects. Here I say how long it took,
+and the line goes where Org would have put it.
+
 ## Install
 
 Not on MELPA yet. With `use-package` and Emacs 30's `:vc`:
@@ -19,6 +26,12 @@ Not on MELPA yet. With `use-package` and Emacs 30's `:vc`:
 ```elisp
 (use-package org-retroclock
   :vc (:url "https://github.com/Jotham-LEC/org-retroclock" :rev :newest))
+```
+
+On Emacs 29, install it once with `package-vc-install`:
+
+```elisp
+(package-vc-install "https://github.com/Jotham-LEC/org-retroclock")
 ```
 
 Or with [straight.el](https://github.com/radian-software/straight.el):
@@ -41,19 +54,27 @@ Emacs 29.1 or newer. Nothing beyond Org, which you already have.
 
 `M-x org-retroclock` logs against the Org entry at point. `M-x org-retroclock-recent`
 asks first which task, using the same picker `org-clock-in` offers for recently clocked
-tasks, so the entry need not be on screen or even in an open buffer.
+tasks, so the entry need not be on screen or even in an open buffer. That picker reads
+`org-clock-history`, which Org forgets when Emacs exits. To keep it across sessions:
 
-Both then ask a duration — `90` or `1:30`, whatever `org-duration-to-minutes` reads —
-and log the span ending now. With a prefix argument they ask which end of the span to
+```elisp
+(setq org-clock-persist 'history)
+(org-clock-persistence-insinuate)
+```
+
+Both then ask a duration — `90`, `90m`, `1h30m` or `1:30` — and log the span ending
+now. Org on its own reads `m` as months, so `90m` would be seven and a half years; here
+it means minutes. With a prefix argument they ask which end of the span to
 pin instead, read that time through `org-read-date`, and measure the duration from
 there: `s` for an hour you started at nine this morning, `e` for a meeting that ended
-at six.
+at six. Less than a minute, or a span that ends in the future, is refused. More than a
+day asks first.
 
 Nothing is bound out of the box, because where these belong depends on where your other
 Org clock keys are:
 
 ```elisp
-(keymap-set org-mode-map "C-c C-x C-p" #'org-retroclock)
+(keymap-set org-mode-map "C-c C-x h" #'org-retroclock)
 (keymap-global-set "C-c o p" #'org-retroclock-recent)
 ```
 
@@ -61,7 +82,7 @@ In Doom, alongside the stock clock leader:
 
 ```elisp
 (map! :leader :prefix ("n" . "notes")
-      :desc "Retro clock (recent)" "c p" #'org-retroclock-recent)
+      :desc "Retro clock (recent)" "p" #'org-retroclock-recent)
 (map! :after org :map org-mode-map :localleader
       :desc "Retro clock (log past)" "c p" #'org-retroclock)
 ```
