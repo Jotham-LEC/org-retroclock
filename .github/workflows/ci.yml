@@ -19,3 +19,25 @@ jobs:
           version: ${{ matrix.emacs }}
       - run: make deps
       - run: make compile lint test
+
+  # riscy/melpazoid ships no reusable action; this is its documented workflow
+  # (melpazoid.yml in that repo) as a job, so a MELPA submission meets no
+  # surprises.
+  melpazoid:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.10'
+      - name: Install
+        run: |
+          sudo apt-get install emacs && emacs --version
+          git clone https://github.com/riscy/melpazoid.git ~/melpazoid
+      - name: Run
+        env:
+          LOCAL_REPO: ${{ github.workspace }}
+          RECIPE: (org-retroclock :fetcher github :repo "Jotham-LEC/org-retroclock")
+          WARN_IS_ERROR: true
+          EXIST_OK: false
+        run: echo "$GITHUB_REF" && make -C ~/melpazoid

@@ -108,7 +108,7 @@ make deps                # package-lint, into ./.deps
 make compile lint test   # byte-compile clean, checkdoc, package-lint, ERT
 ```
 
-CI runs the same three on Emacs 29 and 30.
+CI runs the same three on Emacs 29 and 30, and melpazoid on top.
 
 ## License
 
