@@ -289,5 +289,14 @@ DURATION is the string typed at the duration prompt."
       (goto-char (point-min))
       (should (equal (org-clock-sum-current-item) 0)))))
 
+(ert-deftest org-retroclock-rounds-now-into-the-past ()
+  (let ((org-clock-rounding-minutes 5)
+        (now (encode-time '(0 33 10 24 9 2026 nil -1 nil))))
+    (cl-letf (((symbol-function 'current-time) (lambda () now))
+              ((symbol-function 'read-string) (lambda (&rest _) "90")))
+      (pcase-let ((`(,start . ,end) (org-retroclock--read-times nil)))
+        (should (time-equal-p start org-retroclock-test--start))
+        (should (time-equal-p end org-retroclock-test--end))))))
+
 (provide 'org-retroclock-test)
 ;;; org-retroclock-test.el ends here

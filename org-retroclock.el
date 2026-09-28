@@ -112,14 +112,15 @@ of more than a day has to be confirmed."
 
 (defun org-retroclock--read-times (anchored)
   "Return the cons (START . END) of a span read from the minibuffer.
-When ANCHORED is nil the span is a duration ending now.  Otherwise ask
+When ANCHORED is nil the span is a duration ending now, rounded down
+by `org-clock-rounding-minutes' as `org-clock-in' would.  Otherwise ask
 which end to pin, read that time, and read the duration from there.
 A span that ends more than a minute from now is refused: this logs work
 already done."
   (let ((span
          (if (not anchored)
              (let* ((minutes (org-retroclock--read-duration))
-                    (end (current-time)))
+                    (end (org-current-time org-clock-rounding-minutes t)))
                (cons (time-subtract end (seconds-to-time (* minutes 60))) end))
            (pcase (read-char-choice "Anchor: [s]tart time  [e]nd time: " '(?s ?e))
              (?s (let* ((start (org-read-date t t nil "Start time"))
