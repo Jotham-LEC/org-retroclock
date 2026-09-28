@@ -63,7 +63,8 @@
 When non-nil a task clocked retroactively becomes a recent task like
 any other, so it is offered by the pickers of `org-clock-in' and
 `org-retroclock-recent' afterwards."
-  :type 'boolean)
+  :type 'boolean
+  :package-version '(org-retroclock . "0.1.0"))
 
 (defun org-retroclock--insert (start end)
   "Insert a finished CLOCK line spanning START to END on the entry at point.
@@ -139,7 +140,7 @@ already done."
   "Log a finished CLOCK entry on the Org entry at point.
 Without a prefix, read a duration and log the span ending now.  With
 prefix ARG, pin a start or end time first and log the span from there."
-  (interactive "P")
+  (interactive "P" org-mode)
   (barf-if-buffer-read-only)
   (pcase-let ((`(,start . ,end) (org-retroclock--read-times arg)))
     (org-with-wide-buffer
