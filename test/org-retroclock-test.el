@@ -239,5 +239,55 @@ DURATION is the string typed at the duration prompt."
   (should (org-retroclock-test--read-anchored
            ?s (time-subtract (current-time) 5400) "90")))
 
+(defmacro org-retroclock-test--no-prompts (&rest body)
+  "Run BODY, failing the test if it reads a duration or an anchor."
+  (declare (indent 0))
+  `(cl-letf (((symbol-function 'read-string)
+              (lambda (&rest _) (ert-fail "read-string was called")))
+             ((symbol-function 'read-char-choice)
+              (lambda (&rest _) (ert-fail "read-char-choice was called"))))
+     ,@body))
+
+(defmacro org-retroclock-test--picking (marker &rest body)
+  "Run BODY with `org-clock-select-task' returning MARKER."
+  (declare (indent 1))
+  `(cl-letf (((symbol-function 'org-clock-load) #'ignore)
+             ((symbol-function 'org-clock-select-task)
+              (lambda (&rest _) ,marker)))
+     ,@body))
+
+(ert-deftest org-retroclock-refuses-a-read-only-buffer-before-prompting ()
+  (org-retroclock-test--with-entry
+    (setq buffer-read-only t)
+    (org-retroclock-test--no-prompts
+      (should-error (org-retroclock nil) :type 'buffer-read-only))))
+
+(ert-deftest org-retroclock-recent-refuses-a-read-only-task-before-prompting ()
+  (org-retroclock-test--with-entry
+    (setq buffer-read-only t)
+    (let ((marker (point-marker)))
+      (with-temp-buffer
+        (org-retroclock-test--picking marker
+          (org-retroclock-test--no-prompts
+            (should-error (org-retroclock-recent nil) :type 'buffer-read-only)))))))
+
+(ert-deftest org-retroclock-recent-logs-on-the-picked-task ()
+  (org-retroclock-test--with-entry
+    (insert "* Other\n* Picked\n")
+    (goto-char (point-min))
+    (re-search-forward "^\\* Picked")
+    (let ((marker (copy-marker (line-beginning-position))))
+      (goto-char (point-min))
+      (narrow-to-region (point) (line-end-position))
+      (with-temp-buffer
+        (org-retroclock-test--picking marker
+          (cl-letf (((symbol-function 'read-string) (lambda (&rest _) "90m")))
+            (org-retroclock-recent nil))))
+      (widen)
+      (goto-char marker)
+      (should (equal (org-clock-sum-current-item) 90))
+      (goto-char (point-min))
+      (should (equal (org-clock-sum-current-item) 0)))))
+
 (provide 'org-retroclock-test)
 ;;; org-retroclock-test.el ends here

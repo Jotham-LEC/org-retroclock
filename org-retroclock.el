@@ -139,6 +139,7 @@ already done."
 Without a prefix, read a duration and log the span ending now.  With
 prefix ARG, pin a start or end time first and log the span from there."
   (interactive "P")
+  (barf-if-buffer-read-only)
   (pcase-let ((`(,start . ,end) (org-retroclock--read-times arg)))
     (org-with-wide-buffer
      (org-retroclock--insert start end))))
@@ -154,6 +155,8 @@ task Org remembers clocking, rather than the entry at point."
   (let ((marker (org-clock-select-task "Retro-clock which recent task? ")))
     (unless (and (markerp marker) (marker-buffer marker))
       (user-error "No task selected"))
+    (with-current-buffer (marker-buffer marker)
+      (barf-if-buffer-read-only))
     (pcase-let ((`(,start . ,end) (org-retroclock--read-times arg)))
       (with-current-buffer (marker-buffer marker)
         (org-with-wide-buffer
