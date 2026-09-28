@@ -5,7 +5,7 @@
 ;; Author: Jotham Lim Ee Chen <jotham@cothink.ing>
 ;; Assisted-by: Claude:claude-opus-5
 ;; URL: https://github.com/Jotham-LEC/org-retroclock
-;; Version: 0.1.0
+;; Version: 0.1.1
 ;; Package-Requires: ((emacs "29.1"))
 ;; Keywords: outlines, calendar, convenience
 ;; SPDX-License-Identifier: GPL-3.0-or-later
