@@ -154,5 +154,31 @@
   (cl-letf (((symbol-function 'read-string) (lambda (&rest _) "0")))
     (should-error (org-retroclock--read-times nil) :type 'user-error)))
 
+(ert-deftest org-retroclock-ignores-narrowing-to-the-heading-line ()
+  (org-retroclock-test--with-entry
+    (goto-char (point-max))
+    (insert ":LOGBOOK:\nCLOCK: [2026-09-01 Tue 08:00]--[2026-09-01 Tue 09:00] =>  1:00\n:END:\n")
+    (goto-char (point-min))
+    (narrow-to-region (point) (line-end-position))
+    (cl-letf (((symbol-function 'read-string) (lambda (&rest _) "90")))
+      (org-retroclock nil))
+    (should (= (point-max) (line-end-position)))
+    (widen)
+    (should (= (how-many ":LOGBOOK:" (point-min) (point-max)) 1))
+    (goto-char (point-min))
+    (should (equal (org-clock-sum-current-item) 150))))
+
+(ert-deftest org-retroclock-ignores-narrowing-to-the-body ()
+  (org-retroclock-test--with-entry
+    (goto-char (point-max))
+    (insert "body line\n")
+    (goto-char (point-min))
+    (forward-line 1)
+    (narrow-to-region (point) (point-max))
+    (cl-letf (((symbol-function 'read-string) (lambda (&rest _) "90")))
+      (org-retroclock nil))
+    (widen)
+    (should (string-match-p "\\`\\* Write the tests\n:LOGBOOK:\nCLOCK: " (buffer-string)))))
+
 (provide 'org-retroclock-test)
 ;;; org-retroclock-test.el ends here

@@ -121,7 +121,8 @@ Without a prefix, read a duration and log the span ending now.  With
 prefix ARG, pin a start or end time first and log the span from there."
   (interactive "P")
   (pcase-let ((`(,start . ,end) (org-retroclock--read-times arg)))
-    (org-retroclock--insert start end)))
+    (org-with-wide-buffer
+     (org-retroclock--insert start end))))
 
 ;;;###autoload
 (defun org-retroclock-recent (arg)
