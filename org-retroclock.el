@@ -3,10 +3,12 @@
 ;; Copyright (C) 2026 Jotham Lim Ee Chen
 
 ;; Author: Jotham Lim Ee Chen <jotham@cothink.ing>
+;; Assisted-by: Claude:claude-opus-5
 ;; URL: https://github.com/Jotham-LEC/org-retroclock
 ;; Version: 0.1.0
 ;; Package-Requires: ((emacs "29.1"))
 ;; Keywords: outlines, calendar, convenience
+;; SPDX-License-Identifier: GPL-3.0-or-later
 
 ;; This program is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
