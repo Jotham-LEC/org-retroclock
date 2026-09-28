@@ -212,5 +212,10 @@ asked and CONFIRM is the symbol `never'."
       (org-retroclock--read-times nil))
     (should (string-prefix-p "Duration (90, 90m, 1h30m or 1:30)" prompt))))
 
+(ert-deftest org-retroclock-refuses-less-than-a-minute ()
+  (should-error (org-retroclock-test--read-duration "0:00:30" 'never) :type 'user-error)
+  (should-error (org-retroclock-test--read-duration "0.5" 'never) :type 'user-error)
+  (should (= (org-retroclock-test--read-duration "1" 'never) 1)))
+
 (provide 'org-retroclock-test)
 ;;; org-retroclock-test.el ends here

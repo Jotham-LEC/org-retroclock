@@ -94,15 +94,16 @@ START and END are Lisp timestamps."
 (defun org-retroclock--read-duration ()
   "Read a duration from the minibuffer and return it in minutes.
 Org reads a bare \"m\" as months, so a number followed by \"m\" is
-taken as minutes here: nobody logs a clock in months.  A span of more
-than a day has to be confirmed."
+taken as minutes here: nobody logs a clock in months.  A span under a
+minute is refused, because the CLOCK line would total 0:00, and a span
+of more than a day has to be confirmed."
   (let* ((input (replace-regexp-in-string
                  "\\([0-9.]\\)m\\b" "\\1min"
                  (read-string "Duration (90, 90m, 1h30m or 1:30): ")
                  t))
          (minutes (org-duration-to-minutes input)))
-    (when (<= minutes 0)
-      (user-error "Duration must be positive"))
+    (when (< minutes 1)
+      (user-error "Duration must be at least a minute"))
     (when (and (> minutes (* 24 60))
                (not (y-or-n-p (format "Log %s, more than a day? "
                                       (org-duration-from-minutes minutes)))))
