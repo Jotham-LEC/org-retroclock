@@ -91,11 +91,22 @@ START and END are Lisp timestamps."
       (org-back-to-heading t)
       (org-clock-history-push))))
 
-(defun org-retroclock--read-duration (prompt)
-  "Read a positive duration in minutes, using PROMPT."
-  (let ((minutes (org-duration-to-minutes (read-string prompt))))
+(defun org-retroclock--read-duration ()
+  "Read a duration from the minibuffer and return it in minutes.
+Org reads a bare \"m\" as months, so a number followed by \"m\" is
+taken as minutes here: nobody logs a clock in months.  A span of more
+than a day has to be confirmed."
+  (let* ((input (replace-regexp-in-string
+                 "\\([0-9.]\\)m\\b" "\\1min"
+                 (read-string "Duration (90, 90m, 1h30m or 1:30): ")
+                 t))
+         (minutes (org-duration-to-minutes input)))
     (when (<= minutes 0)
       (user-error "Duration must be positive"))
+    (when (and (> minutes (* 24 60))
+               (not (y-or-n-p (format "Log %s, more than a day? "
+                                      (org-duration-from-minutes minutes)))))
+      (user-error "Not logged"))
     minutes))
 
 (defun org-retroclock--read-times (anchored)
@@ -103,15 +114,15 @@ START and END are Lisp timestamps."
 When ANCHORED is nil the span is a duration ending now.  Otherwise ask
 which end to pin, read that time, and read the duration from there."
   (if (not anchored)
-      (let* ((minutes (org-retroclock--read-duration "Duration (mm or HH:mm): "))
+      (let* ((minutes (org-retroclock--read-duration))
              (end (current-time)))
         (cons (time-subtract end (seconds-to-time (* minutes 60))) end))
     (pcase (read-char-choice "Anchor: [s]tart time  [e]nd time: " '(?s ?e))
       (?s (let* ((start (org-read-date t t nil "Start time"))
-                 (minutes (org-retroclock--read-duration "Duration (mm or HH:mm): ")))
+                 (minutes (org-retroclock--read-duration)))
             (cons start (time-add start (seconds-to-time (* minutes 60))))))
       (?e (let* ((end (org-read-date t t nil "End time"))
-                 (minutes (org-retroclock--read-duration "Duration (mm or HH:mm): ")))
+                 (minutes (org-retroclock--read-duration)))
             (cons (time-subtract end (seconds-to-time (* minutes 60))) end))))))
 
 ;;;###autoload

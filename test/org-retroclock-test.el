@@ -180,5 +180,37 @@
     (widen)
     (should (string-match-p "\\`\\* Write the tests\n:LOGBOOK:\nCLOCK: " (buffer-string)))))
 
+(defun org-retroclock-test--read-duration (input &optional confirm)
+  "Return what `org-retroclock--read-duration' makes of INPUT.
+CONFIRM is the answer to any `y-or-n-p', which fails the test if it is
+asked and CONFIRM is the symbol `never'."
+  (cl-letf (((symbol-function 'read-string) (lambda (&rest _) input))
+            ((symbol-function 'y-or-n-p)
+             (lambda (&rest _)
+               (when (eq confirm 'never)
+                 (ert-fail "y-or-n-p was not expected"))
+               confirm)))
+    (org-retroclock--read-duration)))
+
+(ert-deftest org-retroclock-reads-m-as-minutes-not-months ()
+  (should (= (org-retroclock-test--read-duration "90m" 'never) 90))
+  (should (= (org-retroclock-test--read-duration "1h30m" 'never) 90))
+  (should (= (org-retroclock-test--read-duration "1.5h" 'never) 90))
+  (should (= (org-retroclock-test--read-duration "90min" 'never) 90))
+  (should (= (org-retroclock-test--read-duration "1:30" 'never) 90))
+  (should (= (org-retroclock-test--read-duration "90" 'never) 90)))
+
+(ert-deftest org-retroclock-asks-before-logging-more-than-a-day ()
+  (should (= (org-retroclock-test--read-duration "24h" 'never) 1440))
+  (should (= (org-retroclock-test--read-duration "30h" t) 1800))
+  (should-error (org-retroclock-test--read-duration "30h" nil) :type 'user-error))
+
+(ert-deftest org-retroclock-prompt-names-the-accepted-forms ()
+  (let (prompt)
+    (cl-letf (((symbol-function 'read-string)
+               (lambda (p &rest _) (setq prompt p) "90")))
+      (org-retroclock--read-times nil))
+    (should (string-prefix-p "Duration (90, 90m, 1h30m or 1:30)" prompt))))
+
 (provide 'org-retroclock-test)
 ;;; org-retroclock-test.el ends here
