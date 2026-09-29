@@ -56,6 +56,24 @@
                             (time-add org-retroclock-test--start (* 11 3600)))
     (should (string-suffix-p "=> 11:00" (org-retroclock-test--clock-line)))))
 
+;; `org-clock-out' totals the two stamps as written, so the seconds they
+;; drop have to be dropped from the total too.
+(ert-deftest org-retroclock-insert-totals-the-stamps-as-org-does ()
+  (org-retroclock-test--with-entry
+    (org-retroclock--insert (time-add org-retroclock-test--start 30)
+                            org-retroclock-test--end)
+    (should (equal (org-retroclock-test--clock-line)
+                   "CLOCK: [2026-09-24 Thu 09:00]--[2026-09-24 Thu 10:30] =>  1:30")))
+  (org-retroclock-test--with-entry
+    (org-retroclock--insert org-retroclock-test--start
+                            (time-subtract org-retroclock-test--end 30))
+    (should (equal (org-retroclock-test--clock-line)
+                   "CLOCK: [2026-09-24 Thu 09:00]--[2026-09-24 Thu 10:29] =>  1:29"))))
+
+(ert-deftest org-retroclock-reads-a-fraction-to-the-nearest-minute ()
+  (should (= (org-retroclock-test--read-duration "1.33h" 'never) 80))
+  (should (= (org-retroclock-test--read-duration "1:30:40" 'never) 91)))
+
 (ert-deftest org-retroclock-insert-obeys-org-clock-into-drawer ()
   (org-retroclock-test--with-entry
     (let ((org-clock-into-drawer nil))

@@ -76,19 +76,21 @@ START and END are Lisp timestamps."
   (save-excursion
     (org-back-to-heading t)
     (org-clock-find-position nil)
-    (let* ((seconds (floor (float-time (time-subtract end start))))
-           (hours (/ seconds 3600))
-           (minutes (/ (mod seconds 3600) 60))
-           (stamp (org-time-stamp-format t t)))
+    (let* ((stamp (org-time-stamp-format t t))
+           (ts (format-time-string stamp start))
+           (te (format-time-string stamp end))
+           ;; The total is worked out from the stamps, as `org-clock-out'
+           ;; works out its own, so that it agrees with what the line says.
+           (seconds (org-time-convert-to-integer
+                     (time-subtract (org-time-string-to-time te)
+                                    (org-time-string-to-time ts))))
+           (hours (floor seconds 3600))
+           (minutes (floor (mod seconds 3600) 60)))
       ;; `org-clock-find-position' leaves point at the end of the line the
       ;; entry belongs after, which is how `org-clock-in' opens its own line.
       (insert-before-markers-and-inherit "\n")
       (backward-char 1)
-      (insert-and-inherit org-clock-string " "
-                          (format-time-string stamp start)
-                          "--"
-                          (format-time-string stamp end)
-                          " => "
+      (insert-and-inherit org-clock-string " " ts "--" te " => "
                           (format "%2d:%02d" hours minutes))
       (org-indent-line)))
   (when org-retroclock-push-history
@@ -97,7 +99,7 @@ START and END are Lisp timestamps."
       (org-clock-history-push))))
 
 (defun org-retroclock--read-duration ()
-  "Read a duration from the minibuffer and return it in minutes.
+  "Read a duration from the minibuffer and return it in whole minutes.
 Org reads a bare \"m\" as months, so a number followed by \"m\" is
 taken as minutes here: nobody logs a clock in months.  A span under a
 minute is refused, because the CLOCK line would total 0:00, and a span
@@ -113,7 +115,8 @@ of more than a day has to be confirmed."
                (not (y-or-n-p (format "Log %s, more than a day? "
                                       (org-duration-from-minutes minutes)))))
       (user-error "Not logged"))
-    minutes))
+    ;; A CLOCK line has no seconds, so neither does the span.
+    (round minutes)))
 
 (defun org-retroclock--read-times (anchored)
   "Return the cons (START . END) of a span read from the minibuffer.
