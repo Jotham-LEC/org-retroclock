@@ -266,6 +266,8 @@ asked and CONFIRM is the symbol `never'."
 
 (ert-deftest org-retroclock-reads-a-spaced-m-as-minutes ()
   (should (= (org-retroclock-test--read-duration "90 m" 'never) 90))
+  (let ((case-fold-search nil))
+    (should (= (org-retroclock-test--read-duration "90M" 'never) 90)))
   (should (= (org-retroclock-test--read-duration "1h 30 m" 'never) 90))
   (should (= (org-retroclock-test--read-duration " 90 " 'never) 90)))
 

@@ -102,10 +102,11 @@ Org reads a bare \"m\" as months, so a number followed by \"m\" is
 taken as minutes here: nobody logs a clock in months.  A span under a
 minute is refused, because the CLOCK line would total 0:00, and a span
 of more than a day has to be confirmed."
-  (let* ((input (replace-regexp-in-string
-                 "\\([0-9.]\\) *m\\b" "\\1min"
-                 (string-trim (read-string "Duration (90, 90m, 1h30m or 1:30): "))
-                 t))
+  (let* ((input (let ((case-fold-search t))
+                  (replace-regexp-in-string
+                   "\\([0-9.]\\) *m\\b" "\\1min"
+                   (string-trim (read-string "Duration (90, 90m, 1h30m or 1:30): "))
+                   t)))
          (minutes
           ;; `org-duration-p' leaves out the bare number, which
           ;; `org-duration-to-minutes' reads as minutes.
