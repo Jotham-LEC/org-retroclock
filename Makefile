@@ -3,8 +3,10 @@ PACKAGE := org-retroclock
 TESTS := test/$(PACKAGE)-test.el
 
 # Dependencies live in the checkout so that a local run and a CI run see the
-# same versions, and neither touches the Emacs you actually use.
-INIT := --eval '(progn (require (quote package)) (setq package-user-dir (expand-file-name ".deps") package-quickstart-file (expand-file-name ".deps/package-quickstart.el")) (add-to-list (quote package-archives) (cons "melpa" "https://melpa.org/packages/") t) (package-initialize))'
+# same versions, and neither touches the Emacs you actually use.  Each Emacs
+# major version gets its own, since one cannot load another's newer .elc.
+DEPS := .deps/$(shell $(EMACS) -Q --batch --eval '(princ emacs-major-version)')
+INIT := --eval '(progn (require (quote package)) (setq package-user-dir (expand-file-name "$(DEPS)") package-quickstart-file (expand-file-name "$(DEPS)/package-quickstart.el")) (add-to-list (quote package-archives) (cons "melpa" "https://melpa.org/packages/") t) (package-initialize))'
 # Prefer newer sources, so a stale .elc from `make compile' isn't tested.
 BATCH := $(EMACS) -Q --batch --eval '(setq load-prefer-newer t)' $(INIT) -L . -L test
 
