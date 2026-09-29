@@ -400,9 +400,16 @@ asked and CONFIRM is the symbol `never'."
     (should-error (org-retroclock-test--read-anchored ?e "2026-09-24 10:31" "30")
                   :type 'user-error)))
 
+(defun org-retroclock-test--day (days)
+  "Return noon DAYS days from today, going back for a negative DAYS.
+Days are counted on the calendar, since 86400 seconds before late on
+the day the clocks go back is still that day."
+  (pcase-let ((`(,_ ,_ ,_ ,day ,month ,year . ,_) (decode-time)))
+    (encode-time (list 0 0 12 (+ day days) month year nil -1 nil))))
+
 (defun org-retroclock-test--days-ago (days)
   "Return the decoded date DAYS before today."
-  (decode-time (time-subtract nil (* days 86400))))
+  (decode-time (org-retroclock-test--day (- days))))
 
 ;; Org reads a date without a year forwards by default, so "25" typed on
 ;; the 29th was the 25th of next month and refused as the future.
@@ -423,8 +430,8 @@ asked and CONFIRM is the symbol `never'."
 ;; last Friday, so a refusal and the prompt point there.
 (ert-deftest org-retroclock-points-a-future-weekday-at-last-weekday ()
   (let ((system-time-locale "C")
-        (tomorrow (downcase (format-time-string "%a" (time-add nil 86400))))
-        (yesterday (downcase (format-time-string "%a" (time-subtract nil 86400))))
+        (tomorrow (downcase (format-time-string "%a" (org-retroclock-test--day 1))))
+        (yesterday (downcase (format-time-string "%a" (org-retroclock-test--day -1))))
         prompts)
     (should (string-match-p
              "for last Friday type -fri"
@@ -434,7 +441,7 @@ asked and CONFIRM is the symbol `never'."
     (pcase-let ((`(,_ . ,end) (org-retroclock-test--read-anchored
                                ?e (concat "-" yesterday) "30")))
       (should (equal (format-time-string "%F" end)
-                     (format-time-string "%F" (time-subtract nil 86400)))))
+                     (format-time-string "%F" (org-retroclock-test--day -1)))))
     (cl-letf (((symbol-function 'read-char-choice) (lambda (&rest _) ?s))
               ((symbol-function 'read-string)
                (lambda (prompt &rest _)
