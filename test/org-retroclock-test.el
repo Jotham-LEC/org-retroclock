@@ -314,6 +314,14 @@ asked and CONFIRM is the symbol `never'."
   (should (= (org-retroclock-test--read-duration "1h 30 m" 'never) 90))
   (should (= (org-retroclock-test--read-duration " 90 " 'never) 90)))
 
+;; `org-duration-p' took "2H" through `case-fold-search', and then
+;; `org-duration-to-minutes' failed on the unit with a plain error.
+(ert-deftest org-retroclock-reads-upper-case-units ()
+  (dolist (case-fold-search '(t nil))
+    (should (= (org-retroclock-test--read-duration "2H" 'never) 120))
+    (should (= (org-retroclock-test--read-duration "1H30M" 'never) 90))
+    (should (= (org-retroclock-test--read-duration "1.5H" 'never) 90))))
+
 (ert-deftest org-retroclock-refuses-what-is-not-a-duration ()
   (dolist (input '("" "abc" "-30" "1h30" "5m30s"))
     (should-error (org-retroclock-test--read-duration input 'never)
