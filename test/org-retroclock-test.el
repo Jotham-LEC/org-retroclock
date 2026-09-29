@@ -491,18 +491,28 @@ asked and CONFIRM is the symbol `never'."
 
 (defmacro org-retroclock-test--picking (marker &rest body)
   "Run BODY with `org-clock-select-task' returning MARKER.
-The history file stays unread, but the picker fails the test if it is
-called before `org-clock-load' would have read it."
+The history file stays unread: `org-clock-load' only fills the history
+with a task in an open buffer, MARKER if it has one and point otherwise,
+so that the picker comes up.  The picker fails the test if it is called
+before `org-clock-load'."
   (declare (indent 1))
-  (let ((loaded (make-symbol "loaded")))
-    `(let ((,loaded nil))
+  (let ((loaded (make-symbol "loaded"))
+        (picked (make-symbol "picked")))
+    `(let ((,loaded nil)
+           (,picked ,marker)
+           (org-clock-history nil))
        (cl-letf (((symbol-function 'org-clock-load)
-                  (lambda () (setq ,loaded t)))
+                  (lambda ()
+                    (setq ,loaded t)
+                    (setq org-clock-history
+                          (list (if (and (markerp ,picked) (marker-buffer ,picked))
+                                    (copy-marker ,picked)
+                                  (point-marker))))))
                  ((symbol-function 'org-clock-select-task)
                   (lambda (&rest _)
                     (unless ,loaded
                       (ert-fail "The history was not loaded first"))
-                    ,marker)))
+                    ,picked)))
          ,@body))))
 
 (ert-deftest org-retroclock-refuses-a-read-only-buffer-before-prompting ()
@@ -551,6 +561,19 @@ called before `org-clock-load' would have read it."
     (org-retroclock-test--picking marker
       (org-retroclock-test--no-prompts
         (should-error (org-retroclock-recent nil) :type 'user-error)))))
+
+;; A task whose buffer is killed stays in `org-clock-history' as a dead
+;; marker, and Org's picker then came up with nothing to pick.
+(ert-deftest org-retroclock-recent-refuses-when-no-task-is-open ()
+  (let ((org-clock-persist nil)
+        (org-clock-history (list (with-temp-buffer (point-marker)))))
+    (cl-letf (((symbol-function 'read-char-exclusive)
+               (lambda (&rest _) (ert-fail "An empty picker was shown"))))
+      (org-retroclock-test--no-prompts
+        (should (string-match-p
+                 "No recent task"
+                 (error-message-string
+                  (should-error (org-retroclock-recent nil) :type 'user-error))))))))
 
 (ert-deftest org-retroclock-recent-logs-on-the-picked-task ()
   (org-retroclock-test--with-entry

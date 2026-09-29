@@ -204,6 +204,14 @@ prefix ARG.  This is that command's global counterpart: it reaches any
 task Org remembers clocking, rather than the entry at point."
   (interactive "P")
   (org-clock-load)
+  ;; Org's picker lists only the tasks whose buffers are open, but still
+  ;; comes up, empty, when none is.
+  (unless (delq nil (mapcar #'marker-buffer
+                            (append (list org-clock-default-task
+                                          org-clock-interrupted-task
+                                          org-clock-marker)
+                                    org-clock-history)))
+    (user-error "No recent task in an open buffer"))
   (let ((marker (org-clock-select-task "Retro-clock which recent task? ")))
     (unless (and (markerp marker) (marker-buffer marker))
       (user-error "No task selected"))

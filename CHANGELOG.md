@@ -28,6 +28,9 @@ All notable changes to org-retroclock are documented here. The format is based o
 - A time range such as `9:00-10:30` at the date prompt is refused. Org read it as the
   current time, so `-1 9:00-10:30` for the end logged a span ending yesterday at this
   hour.
+- `org-retroclock-recent` says there is no recent task in an open buffer, instead of
+  bringing up Org's picker with nothing in it, when every remembered task's buffer has
+  been killed.
 
 ### Added
 - Both commands echo the line they wrote and the entry it went on.
