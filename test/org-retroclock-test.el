@@ -211,6 +211,16 @@ asked and CONFIRM is the symbol `never'."
   (should (= (org-retroclock-test--read-duration "1:30" 'never) 90))
   (should (= (org-retroclock-test--read-duration "90" 'never) 90)))
 
+(ert-deftest org-retroclock-reads-a-spaced-m-as-minutes ()
+  (should (= (org-retroclock-test--read-duration "90 m" 'never) 90))
+  (should (= (org-retroclock-test--read-duration "1h 30 m" 'never) 90))
+  (should (= (org-retroclock-test--read-duration " 90 " 'never) 90)))
+
+(ert-deftest org-retroclock-refuses-what-is-not-a-duration ()
+  (dolist (input '("" "abc" "-30" "1h30" "5m30s"))
+    (should-error (org-retroclock-test--read-duration input 'never)
+                  :type 'user-error)))
+
 (ert-deftest org-retroclock-asks-before-logging-more-than-a-day ()
   (should (= (org-retroclock-test--read-duration "24h" 'never) 1440))
   (should (= (org-retroclock-test--read-duration "30h" t) 1800))
