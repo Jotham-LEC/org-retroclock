@@ -8,17 +8,17 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.emacs == 'snapshot' }}
     strategy:
       fail-fast: false
       matrix:
-        emacs: ['29.4', '30.1']
+        emacs: ['29.1', '30.1', '31.1', 'snapshot']
     steps:
       - uses: actions/checkout@v5
-      - uses: purcell/setup-emacs@master
+      - uses: purcell/setup-emacs@34c6ded44899fd1bf74d2889558befd1750e61a7
         with:
           version: ${{ matrix.emacs }}
-      - run: make deps
-      - run: make compile lint test
+      - run: make deps check
 
   # riscy/melpazoid ships no reusable action; this is its documented workflow
   # (melpazoid.yml in that repo) as a job, so a MELPA submission meets no
