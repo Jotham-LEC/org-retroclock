@@ -126,13 +126,18 @@
     (goto-char (point-min))
     (should (equal (org-clock-sum-current-item) 1800))))
 
-(ert-deftest org-retroclock-push-history-is-customisable ()
+;; The option that turned this off is gone, and a setting left behind in
+;; a configuration must not keep it off.
+(ert-deftest org-retroclock-insert-pushes-the-entry-onto-the-history ()
   (org-retroclock-test--with-entry
-    (let ((org-retroclock-push-history nil))
-      (org-retroclock--insert org-retroclock-test--start org-retroclock-test--end))
-    (should (null org-clock-history))
-    (org-retroclock--insert org-retroclock-test--start org-retroclock-test--end)
-    (should (= (length org-clock-history) 1))))
+    (insert "Preamble\n")
+    (let ((heading (point)))
+      (goto-char (point-max))
+      (cl-progv '(org-retroclock-push-history) '(nil)
+        (org-retroclock--insert org-retroclock-test--start org-retroclock-test--end))
+      (should (= (length org-clock-history) 1))
+      (should (eq (marker-buffer (car org-clock-history)) (current-buffer)))
+      (should (= (car org-clock-history) heading)))))
 
 (ert-deftest org-retroclock-read-times-without-anchor-ends-now ()
   (cl-letf (((symbol-function 'read-string) (lambda (&rest _) "1:30")))

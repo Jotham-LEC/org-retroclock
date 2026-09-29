@@ -6,6 +6,11 @@ All notable changes to org-retroclock are documented here. The format is based o
 
 ## [Unreleased]
 
+### Removed
+- `org-retroclock-push-history`. A retroactive clock always joins `org-clock-history`,
+  as `org-clock-in` always adds the task it clocks. A leftover `setq` of the option
+  does nothing and can be deleted.
+
 ## [0.1.1] — 2026-09-28
 
 ### Fixed

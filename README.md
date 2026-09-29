@@ -89,9 +89,8 @@ In Doom, alongside the stock clock leader:
       :desc "Retro clock (log past)" "c p" #'org-retroclock)
 ```
 
-One setting, `org-retroclock-push-history`, on by default: a task you clock
-retroactively becomes a recent task like any other, so the pickers offer it afterwards.
-Set it to `nil` to keep `org-clock-history` to tasks you really clocked.
+There is nothing to set. A task you clock retroactively joins `org-clock-history`, as
+one you clock in does, so the pickers offer it afterwards.
 
 ## How it works
 

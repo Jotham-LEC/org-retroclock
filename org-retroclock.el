@@ -58,24 +58,14 @@
 (require 'org)
 (require 'org-clock)
 
-(defgroup org-retroclock nil
-  "Log finished Org CLOCK entries retroactively."
-  :group 'org-clock
-  :link '(url-link :tag "Homepage" "https://github.com/Jotham-LEC/org-retroclock"))
-
-(defcustom org-retroclock-push-history t
-  "Whether a retroactive clock joins `org-clock-history'.
-When non-nil a task clocked retroactively becomes a recent task like
-any other, so it is offered by the pickers of `org-clock-in' and
-`org-retroclock-recent' afterwards."
-  :type 'boolean
-  :package-version '(org-retroclock . "0.1.0"))
-
 (defun org-retroclock--insert (start end)
   "Insert a finished CLOCK line spanning START to END on the entry at point.
 START and END are Lisp timestamps."
   (save-excursion
     (org-back-to-heading t)
+    ;; A task clocked after the fact is a recent task all the same, as
+    ;; `org-clock-in' makes it.
+    (org-clock-history-push)
     (org-clock-find-position nil)
     (let* ((stamp (org-time-stamp-format t t))
            (ts (format-time-string stamp start))
@@ -93,11 +83,7 @@ START and END are Lisp timestamps."
       (backward-char 1)
       (insert-and-inherit org-clock-string " " ts "--" te " => "
                           (format "%2d:%02d" hours minutes))
-      (org-indent-line)))
-  (when org-retroclock-push-history
-    (save-excursion
-      (org-back-to-heading t)
-      (org-clock-history-push))))
+      (org-indent-line))))
 
 (defun org-retroclock--read-duration ()
   "Read a duration from the minibuffer and return it in whole minutes.
