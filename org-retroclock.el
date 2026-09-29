@@ -60,7 +60,7 @@
 
 (defun org-retroclock--insert (start end)
   "Insert a finished CLOCK line spanning START to END on the entry at point.
-START and END are Lisp timestamps."
+START and END are Lisp timestamps.  Return the line's span and total."
   (save-excursion
     (org-back-to-heading t)
     ;; A task clocked after the fact is a recent task all the same, as
@@ -83,7 +83,18 @@ START and END are Lisp timestamps."
       (backward-char 1)
       (insert-and-inherit org-clock-string " " ts "--" te " => "
                           (format "%2d:%02d" hours minutes))
-      (org-indent-line))))
+      (org-indent-line)
+      ;; A running clock on this entry shows the entry's total in the
+      ;; mode line, which has just grown.
+      (org-back-to-heading t)
+      (when (and (org-clocking-p)
+                 (eq (marker-buffer org-clock-hd-marker)
+                     (org-base-buffer (current-buffer)))
+                 (= org-clock-hd-marker (point)))
+        (setq org-clock-total-time
+              (org-clock-sum-current-item (org-clock-get-sum-start)))
+        (org-clock-update-mode-line))
+      (format "%s--%s => %d:%02d" ts te hours minutes))))
 
 (defun org-retroclock--read-duration ()
   "Read a duration from the minibuffer and return it in whole minutes.
@@ -160,7 +171,8 @@ is refused before anything is asked."
     (pcase-let ((`(,start . ,end) (org-retroclock--read-times arg)))
       (org-with-wide-buffer
        (goto-char marker)
-       (org-retroclock--insert start end)))))
+       (message "Logged %s on %s" (org-retroclock--insert start end)
+                (org-get-heading t t t t))))))
 
 ;;;###autoload
 (defun org-retroclock (arg)

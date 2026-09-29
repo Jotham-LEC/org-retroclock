@@ -8,6 +8,7 @@
 
 (require 'cl-lib)
 (require 'ert)
+(require 'ert-x)
 (require 'org-retroclock)
 
 (defconst org-retroclock-test--start
@@ -138,6 +139,53 @@
       (should (= (length org-clock-history) 1))
       (should (eq (marker-buffer (car org-clock-history)) (current-buffer)))
       (should (= (car org-clock-history) heading)))))
+
+;; The mode line of a running clock shows the entry's total, which a
+;; retroactive clock on the same entry adds to.
+(ert-deftest org-retroclock-insert-updates-the-running-clock-on-the-entry ()
+  (org-retroclock-test--with-entry
+    (insert "* Other\n")
+    ;; Point is on the second entry, and the first is Other.
+    (let ((org-clock-persist nil)
+          (org-clock-in-hook nil)
+          (org-clock-out-hook nil)
+          (org-clock-mode-line-total 'all))
+      (org-clock-in)
+      (unwind-protect
+          (progn
+            (should (= org-clock-total-time 0))
+            (org-retroclock--insert org-retroclock-test--start org-retroclock-test--end)
+            (should (= org-clock-total-time 90))
+            (should (string-match-p "1:30" org-mode-line-string))
+            ;; A clock on another entry leaves the running one alone.
+            (goto-char (point-min))
+            (org-retroclock--insert org-retroclock-test--start
+                                    (time-add org-retroclock-test--start 1800))
+            (should (= org-clock-total-time 90))
+            ;; Nor does one at the same place in another buffer.
+            (let ((text (buffer-string))
+                  (place (marker-position org-clock-hd-marker)))
+              (with-temp-buffer
+                (org-mode)
+                (insert text)
+                (goto-char place)
+                (org-retroclock--insert org-retroclock-test--start
+                                        (time-add org-retroclock-test--start 1800))))
+            (should (= org-clock-total-time 90)))
+        (org-clock-out nil t)))))
+
+(ert-deftest org-retroclock-says-what-it-logged ()
+  (org-retroclock-test--with-entry
+    (ert-with-message-capture messages
+      (cl-letf (((symbol-function 'read-char-choice) (lambda (&rest _) ?s))
+                ((symbol-function 'read-string)
+                 (lambda (prompt &rest _)
+                   (if (string-prefix-p "Duration" prompt) "90" "2026-09-24 09:00"))))
+        (org-retroclock '(4)))
+      (should (string-match-p
+               (regexp-quote (concat "Logged [2026-09-24 Thu 09:00]--[2026-09-24 Thu 10:30]"
+                                     " => 1:30 on Write the tests"))
+               messages)))))
 
 (ert-deftest org-retroclock-read-times-without-anchor-ends-now ()
   (cl-letf (((symbol-function 'read-string) (lambda (&rest _) "1:30")))
