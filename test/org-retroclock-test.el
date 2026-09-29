@@ -257,6 +257,16 @@ DURATION is the string typed at the duration prompt."
   (should (org-retroclock-test--read-anchored
            ?s (time-subtract (current-time) 5400) "90")))
 
+;; `org-current-time' rounds by `org-time-stamp-rounding-minutes', which
+;; can put "now" minutes in the past and refuse the present as the future.
+(ert-deftest org-retroclock-does-not-round-now-when-refusing-the-future ()
+  (let ((org-clock-rounding-minutes 0)
+        (org-time-stamp-rounding-minutes '(15 5))
+        (now (encode-time '(0 37 10 24 9 2026 nil -1 nil))))
+    (cl-letf (((symbol-function 'current-time) (lambda () now))
+              ((symbol-function 'read-string) (lambda (&rest _) "30")))
+      (should (time-equal-p (cdr (org-retroclock--read-times nil)) now)))))
+
 (defmacro org-retroclock-test--no-prompts (&rest body)
   "Run BODY, failing the test if it reads a duration or an anchor."
   (declare (indent 0))

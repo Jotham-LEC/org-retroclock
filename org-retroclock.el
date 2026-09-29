@@ -137,7 +137,7 @@ already done."
              (?e (let* ((end (org-read-date t t nil "End time"))
                         (minutes (org-retroclock--read-duration)))
                    (cons (time-subtract end (seconds-to-time (* minutes 60))) end)))))))
-    (when (time-less-p (time-add (org-current-time) 60) (cdr span))
+    (when (time-less-p (time-add (current-time) 60) (cdr span))
       (user-error "That span ends in the future, at %s"
                   (format-time-string (org-time-stamp-format t t) (cdr span))))
     span))
