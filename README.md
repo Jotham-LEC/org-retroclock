@@ -67,8 +67,10 @@ now. Org on its own reads `m` as months, so `90m` would be seven and a half year
 it means minutes. With a prefix argument they ask which end of the span to
 pin instead, read that time through `org-read-date`, and measure the duration from
 there: `s` for an hour you started at nine this morning, `e` for a meeting that ended
-at six. Less than a minute, or a span that ends in the future, is refused. More than a
-day asks first.
+at six. A date without a year reads as the past one, so `25 14:00` is the 25th just
+gone; a weekday does not, since Org reads `fri` as the coming Friday whatever it is
+told, so type `-fri` for last Friday. Less than a minute, or a span that ends in the
+future, is refused. More than a day asks first.
 
 Nothing is bound out of the box, because where these belong depends on where your other
 Org clock keys are:

@@ -150,23 +150,26 @@
       (should (= (round (float-time (time-subtract end start))) 5400))
       (should (< (abs (float-time (time-subtract (current-time) end))) 5)))))
 
+(defun org-retroclock-test--read-anchored (anchor date duration)
+  "Return `org-retroclock--read-times' for ANCHOR, ?s or ?e.
+DATE is typed at Org's date prompt and DURATION at the duration prompt."
+  (cl-letf (((symbol-function 'read-char-choice) (lambda (&rest _) anchor))
+            ((symbol-function 'read-string)
+             (lambda (prompt &rest _)
+               (if (string-prefix-p "Duration" prompt) duration date))))
+    (org-retroclock--read-times t)))
+
 (ert-deftest org-retroclock-read-times-anchors-on-a-start ()
-  (cl-letf (((symbol-function 'read-char-choice) (lambda (&rest _) ?s))
-            ((symbol-function 'org-read-date)
-             (lambda (&rest _) org-retroclock-test--start))
-            ((symbol-function 'read-string) (lambda (&rest _) "90")))
-    (pcase-let ((`(,start . ,end) (org-retroclock--read-times t)))
-      (should (time-equal-p start org-retroclock-test--start))
-      (should (time-equal-p end org-retroclock-test--end)))))
+  (pcase-let ((`(,start . ,end) (org-retroclock-test--read-anchored
+                                 ?s "2026-09-24 09:00" "90")))
+    (should (time-equal-p start org-retroclock-test--start))
+    (should (time-equal-p end org-retroclock-test--end))))
 
 (ert-deftest org-retroclock-read-times-anchors-on-an-end ()
-  (cl-letf (((symbol-function 'read-char-choice) (lambda (&rest _) ?e))
-            ((symbol-function 'org-read-date)
-             (lambda (&rest _) org-retroclock-test--end))
-            ((symbol-function 'read-string) (lambda (&rest _) "90")))
-    (pcase-let ((`(,start . ,end) (org-retroclock--read-times t)))
-      (should (time-equal-p start org-retroclock-test--start))
-      (should (time-equal-p end org-retroclock-test--end)))))
+  (pcase-let ((`(,start . ,end) (org-retroclock-test--read-anchored
+                                 ?e "2026-09-24 10:30" "90")))
+    (should (time-equal-p start org-retroclock-test--start))
+    (should (time-equal-p end org-retroclock-test--end))))
 
 (ert-deftest org-retroclock-rejects-a-non-positive-duration ()
   (cl-letf (((symbol-function 'read-string) (lambda (&rest _) "0")))
@@ -235,27 +238,69 @@ asked and CONFIRM is the symbol `never'."
   (should-error (org-retroclock-test--read-duration "0.5" 'never) :type 'user-error)
   (should (= (org-retroclock-test--read-duration "1" 'never) 1)))
 
-(defun org-retroclock-test--read-anchored (anchor time duration)
-  "Return `org-retroclock--read-times' for ANCHOR (?s or ?e) at TIME.
-DURATION is the string typed at the duration prompt."
-  (cl-letf (((symbol-function 'read-char-choice) (lambda (&rest _) anchor))
-            ((symbol-function 'org-read-date) (lambda (&rest _) time))
-            ((symbol-function 'read-string) (lambda (&rest _) duration)))
-    (org-retroclock--read-times t)))
+(defmacro org-retroclock-test--at (time &rest body)
+  "Run BODY with the clock reading TIME."
+  (declare (indent 1))
+  `(cl-letf (((symbol-function 'current-time) (lambda () ,time)))
+     ,@body))
 
 (ert-deftest org-retroclock-refuses-an-end-in-the-future ()
-  (should-error (org-retroclock-test--read-anchored
-                 ?e (time-add (current-time) 3600) "30")
-                :type 'user-error)
-  (should-error (org-retroclock-test--read-anchored
-                 ?s (time-subtract (current-time) 1800) "90")
-                :type 'user-error))
+  (org-retroclock-test--at (encode-time '(0 0 10 24 9 2026 nil -1 nil))
+    (should-error (org-retroclock-test--read-anchored ?e "2026-09-24 11:00" "30")
+                  :type 'user-error)
+    (should-error (org-retroclock-test--read-anchored ?s "2026-09-24 09:30" "90")
+                  :type 'user-error)))
 
 (ert-deftest org-retroclock-allows-an-end-within-a-minute-of-now ()
-  (should (org-retroclock-test--read-anchored
-           ?e (time-add (current-time) 30) "30"))
-  (should (org-retroclock-test--read-anchored
-           ?s (time-subtract (current-time) 5400) "90")))
+  (org-retroclock-test--at (encode-time '(30 29 10 24 9 2026 nil -1 nil))
+    (should (org-retroclock-test--read-anchored ?e "2026-09-24 10:30" "30"))
+    (should (org-retroclock-test--read-anchored ?s "2026-09-24 09:00" "90"))
+    (should-error (org-retroclock-test--read-anchored ?e "2026-09-24 10:31" "30")
+                  :type 'user-error)))
+
+(defun org-retroclock-test--days-ago (days)
+  "Return the decoded date DAYS before today."
+  (decode-time (time-subtract nil (* days 86400))))
+
+;; Org reads a date without a year forwards by default, so "25" typed on
+;; the 29th was the 25th of next month and refused as the future.
+(ert-deftest org-retroclock-reads-a-date-without-a-year-as-past ()
+  (let* ((today (decode-time))
+         (yesterday (org-retroclock-test--days-ago 1))
+         (typed (cond ((/= (decoded-time-year yesterday) (decoded-time-year today))
+                       (ert-skip "No earlier date this year to type without a year"))
+                      ((= (decoded-time-month yesterday) (decoded-time-month today))
+                       (format "%d" (decoded-time-day yesterday)))
+                      (t (format "%d-%d" (decoded-time-month yesterday)
+                                 (decoded-time-day yesterday))))))
+    (pcase-let ((`(,_ . ,end) (org-retroclock-test--read-anchored ?e typed "30")))
+      (should (equal (format-time-string "%F" end)
+                     (format-time-string "%F" (encode-time yesterday)))))))
+
+;; Org reads a bare weekday forwards whatever it is told, and "-fri" as
+;; last Friday, so a refusal and the prompt point there.
+(ert-deftest org-retroclock-points-a-future-weekday-at-last-weekday ()
+  (let ((system-time-locale "C")
+        (tomorrow (downcase (format-time-string "%a" (time-add nil 86400))))
+        (yesterday (downcase (format-time-string "%a" (time-subtract nil 86400))))
+        prompts)
+    (should (string-match-p
+             "for last Friday type -fri"
+             (error-message-string
+              (should-error (org-retroclock-test--read-anchored ?e tomorrow "30")
+                            :type 'user-error))))
+    (pcase-let ((`(,_ . ,end) (org-retroclock-test--read-anchored
+                               ?e (concat "-" yesterday) "30")))
+      (should (equal (format-time-string "%F" end)
+                     (format-time-string "%F" (time-subtract nil 86400)))))
+    (cl-letf (((symbol-function 'read-char-choice) (lambda (&rest _) ?s))
+              ((symbol-function 'read-string)
+               (lambda (prompt &rest _)
+                 (push prompt prompts)
+                 (if (string-prefix-p "Duration" prompt) "30" "-fri"))))
+      (org-retroclock--read-times t))
+    (should (cl-some (lambda (p) (string-match-p "-fri for last Friday" p))
+                     prompts))))
 
 ;; `org-current-time' rounds by `org-time-stamp-rounding-minutes', which
 ;; can put "now" minutes in the past and refuse the present as the future.

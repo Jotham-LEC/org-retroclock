@@ -44,8 +44,9 @@
 ;; trailing "m" means minutes, not Org's months.  With a prefix argument
 ;; they first ask which end of the span you want to pin, then read that
 ;; time and the duration, so an hour you spent this morning and a meeting
-;; that ended at six are equally easy to say.  A span under a minute or
-;; ending in the future is refused, and one over a day asks first.
+;; that ended at six are equally easy to say.  A date without a year is
+;; read as the past one, and "-fri" is last Friday.  A span under a minute
+;; or ending in the future is refused, and one over a day asks first.
 ;;
 ;; No keys are bound.  Bind the two commands wherever your Org keys live:
 ;;
@@ -118,6 +119,13 @@ of more than a day has to be confirmed."
     ;; A CLOCK line has no seconds, so neither does the span.
     (round minutes)))
 
+(defun org-retroclock--read-date (prompt)
+  "Read a date and time with PROMPT, taking a date without a year as past.
+Org reads a bare weekday forwards however it is told, so the prompt
+also mentions \"-fri\", which Org reads as last Friday."
+  (let ((org-read-date-prefer-future nil))
+    (org-read-date t t nil (concat prompt " (-fri for last Friday)"))))
+
 (defun org-retroclock--read-times (anchored)
   "Return the cons (START . END) of a span read from the minibuffer.
 When ANCHORED is nil the span is a duration ending now, rounded down
@@ -131,14 +139,14 @@ already done."
                     (end (org-current-time org-clock-rounding-minutes t)))
                (cons (time-subtract end (seconds-to-time (* minutes 60))) end))
            (pcase (read-char-choice "Anchor: [s]tart time  [e]nd time: " '(?s ?e))
-             (?s (let* ((start (org-read-date t t nil "Start time"))
+             (?s (let* ((start (org-retroclock--read-date "Start time"))
                         (minutes (org-retroclock--read-duration)))
                    (cons start (time-add start (seconds-to-time (* minutes 60))))))
-             (?e (let* ((end (org-read-date t t nil "End time"))
+             (?e (let* ((end (org-retroclock--read-date "End time"))
                         (minutes (org-retroclock--read-duration)))
                    (cons (time-subtract end (seconds-to-time (* minutes 60))) end)))))))
     (when (time-less-p (time-add (current-time) 60) (cdr span))
-      (user-error "That span ends in the future, at %s"
+      (user-error "That span ends in the future, at %s; for last Friday type -fri"
                   (format-time-string (org-time-stamp-format t t) (cdr span))))
     span))
 
