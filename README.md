@@ -108,11 +108,13 @@ started and no running clock is disturbed.
 It is a small package and a personal one. Bug reports and pull requests are welcome.
 
 ```sh
-make deps                # package-lint, into ./.deps
-make compile lint test   # byte-compile clean, checkdoc, package-lint, ERT
+make deps     # package-lint and relint, into ./.deps
+make check    # byte-compile, checkdoc, package-lint, relint, format check, ERT
+make format   # indent as emacs -Q does
 ```
 
-CI runs the same three on Emacs 29 and 30, and melpazoid on top.
+CI runs `make check` on Emacs 29, 30, 31 and a snapshot, and melpazoid on top.
+[CONTRIBUTING.md](CONTRIBUTING.md) says what a change needs.
 
 ## License
 
