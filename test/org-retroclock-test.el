@@ -221,6 +221,47 @@
             (should (= org-clock-total-time 0)))
         (org-clock-out nil t)))))
 
+;; The clocked entry's total counts its subtree, so a line on a child
+;; adds to it as much as one on the entry itself.
+(ert-deftest org-retroclock-insert-updates-a-running-clock-above-the-entry ()
+  (org-retroclock-test--with-entry
+    (save-excursion
+      (goto-char (point-max))
+      (insert "** Child\n*** Grandchild\n* Sibling\n"))
+    (let ((org-clock-persist nil)
+          (org-clock-in-hook nil)
+          (org-clock-out-hook nil)
+          (org-clock-mode-line-total 'all))
+      (org-clock-in)
+      (unwind-protect
+          (progn
+            (re-search-forward "^\\*\\*\\* Grandchild")
+            (org-retroclock--insert org-retroclock-test--start org-retroclock-test--end)
+            (should (= org-clock-total-time 90))
+            (should (string-match-p "1:30" org-mode-line-string))
+            ;; A line outside the subtree leaves the total alone.
+            (re-search-forward "^\\* Sibling")
+            (org-retroclock--insert org-retroclock-test--start org-retroclock-test--end)
+            (should (= org-clock-total-time 90)))
+        (org-clock-out nil t))))
+  ;; Nor does a clock running below the entry take the entry's line.
+  (org-retroclock-test--with-entry
+    (save-excursion
+      (goto-char (point-max))
+      (insert "** Child\n"))
+    (let ((org-clock-persist nil)
+          (org-clock-in-hook nil)
+          (org-clock-out-hook nil)
+          (org-clock-mode-line-total 'all))
+      (save-excursion
+        (re-search-forward "^\\*\\* Child")
+        (org-clock-in))
+      (unwind-protect
+          (progn
+            (org-retroclock--insert org-retroclock-test--start org-retroclock-test--end)
+            (should (= org-clock-total-time 0)))
+        (org-clock-out nil t)))))
+
 (ert-deftest org-retroclock-says-what-it-logged ()
   (org-retroclock-test--with-entry
     (ert-with-message-capture messages

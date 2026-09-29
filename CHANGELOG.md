@@ -23,7 +23,8 @@ All notable changes to org-retroclock are documented here. The format is based o
   Input that is not a duration is refused with a clear message instead of an error
   from inside Org. Units are read in either case, so `2H` is two hours; it used to fail
   inside Org.
-- Logging on the task being clocked updates its total in the mode line.
+- Logging on the task being clocked, or on any entry below it, updates its total in the
+  mode line, which counts the whole subtree.
 - A time range such as `9:00-10:30` at the date prompt is refused. Org read it as the
   current time, so `-1 9:00-10:30` for the end logged a span ending yesterday at this
   hour.

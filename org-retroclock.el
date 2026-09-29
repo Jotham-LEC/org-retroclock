@@ -84,16 +84,18 @@ START and END are Lisp timestamps.  Return the line's span and total."
       (insert-and-inherit org-clock-string " " ts "--" te " => "
                           (format "%2d:%02d" hours minutes))
       (org-indent-line)
-      ;; A running clock on this entry shows the entry's total in the
-      ;; mode line, which has just grown.  With no clock running, the
-      ;; marker has no buffer.
-      (org-back-to-heading t)
-      (when (and (eq (marker-buffer org-clock-hd-marker)
-                     (org-base-buffer (current-buffer)))
-                 (= org-clock-hd-marker (point)))
-        (setq org-clock-total-time
-              (org-clock-sum-current-item (org-clock-get-sum-start)))
-        (org-clock-update-mode-line))
+      ;; A running clock shows in the mode line the total of its entry's
+      ;; subtree, which has just grown if the line went on that entry or
+      ;; below it.  With no clock running, the marker has no buffer.
+      (when (eq (marker-buffer org-clock-hd-marker)
+                (org-base-buffer (current-buffer)))
+        (org-back-to-heading t)
+        (while (and (> (point) org-clock-hd-marker)
+                    (org-up-heading-safe)))
+        (when (= (point) org-clock-hd-marker)
+          (setq org-clock-total-time
+                (org-clock-sum-current-item (org-clock-get-sum-start)))
+          (org-clock-update-mode-line)))
       (format "%s--%s => %d:%02d" ts te hours minutes))))
 
 (defun org-retroclock--read-duration ()
