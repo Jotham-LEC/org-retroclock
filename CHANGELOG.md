@@ -23,6 +23,9 @@ All notable changes to org-retroclock are documented here. The format is based o
   Input that is not a duration is refused with a clear message instead of an error
   from inside Org.
 - Logging on the task being clocked updates its total in the mode line.
+- A time range such as `9:00-10:30` at the date prompt is refused. Org read it as the
+  current time, so `-1 9:00-10:30` for the end logged a span ending yesterday at this
+  hour.
 
 ### Added
 - Both commands echo the line they wrote and the entry it went on.

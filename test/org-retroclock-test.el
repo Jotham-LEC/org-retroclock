@@ -399,6 +399,28 @@ asked and CONFIRM is the symbol `never'."
     (should (cl-some (lambda (p) (string-match-p "\\[[^]]* [0-9]+:[0-9]+\\]" p))
                      prompts))))
 
+;; Org reads "9:00-10:30" as a range only for a caller that asks for
+;; one, and otherwise as the current time, so that span logged yesterday
+;; afternoon instead of yesterday morning.
+(ert-deftest org-retroclock-refuses-a-range-at-the-date-prompt ()
+  (dolist (anchor '(?s ?e))
+    (let (asked)
+      (cl-letf (((symbol-function 'read-char-choice) (lambda (&rest _) anchor))
+                ((symbol-function 'read-string)
+                 (lambda (prompt &rest _)
+                   (if (string-prefix-p "Duration" prompt)
+                       (progn (setq asked t) "90")
+                     "-1 9:00-10:30"))))
+        (should (string-match-p
+                 "not a range"
+                 (error-message-string
+                  (should-error (org-retroclock--read-times t) :type 'user-error))))
+        (should-not asked))))
+  ;; A single time is still read.
+  (pcase-let ((`(,start . ,_) (org-retroclock-test--read-anchored
+                               ?s "2026-09-24 09:00" "90")))
+    (should (time-equal-p start org-retroclock-test--start))))
+
 ;; `org-current-time' rounds by `org-time-stamp-rounding-minutes', which
 ;; can put "now" minutes in the past and refuse the present as the future.
 (ert-deftest org-retroclock-does-not-round-now-when-refusing-the-future ()

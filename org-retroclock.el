@@ -123,12 +123,22 @@ of more than a day has to be confirmed."
     ;; A CLOCK line has no seconds, so neither does the span.
     (round minutes)))
 
+(defvar org-end-time-was-given)
+
 (defun org-retroclock--read-date (prompt)
   "Read a date and time with PROMPT, taking a date without a year as past.
 Org reads a bare weekday forwards however it is told, so the prompt
-also mentions \"-fri\", which Org reads as last Friday."
-  (let ((org-read-date-prefer-future nil))
-    (org-read-date t t nil (concat prompt " (-fri for last Friday)"))))
+also mentions \"-fri\", which Org reads as last Friday.  A time range
+such as \"9:00-10:30\" is refused: the duration is asked next."
+  ;; Org reads a range only for a caller that binds
+  ;; `org-end-time-was-given', and otherwise drops the typed time
+  ;; altogether and uses the current one.
+  (let* ((org-read-date-prefer-future nil)
+         (org-end-time-was-given nil)
+         (time (org-read-date t t nil (concat prompt " (-fri for last Friday)"))))
+    (when org-end-time-was-given
+      (user-error "Type one time, not a range; the duration is asked next"))
+    time))
 
 (defun org-retroclock--read-times (anchored)
   "Return the cons (START . END) of a span read from the minibuffer.
