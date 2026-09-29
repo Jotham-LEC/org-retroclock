@@ -150,16 +150,33 @@ already done."
                   (format-time-string (org-time-stamp-format t t) (cdr span))))
     span))
 
+;; Both commands come through here, so that everything that can refuse
+;; the entry does so before the first prompt.
+(defun org-retroclock--log (marker arg)
+  "Read a span and log it as a finished CLOCK entry on the entry at MARKER.
+ARG is the prefix argument, as for `org-retroclock'.  A buffer that is
+not in Org mode or is read-only, or a MARKER before the first heading,
+is refused before anything is asked."
+  (with-current-buffer (marker-buffer marker)
+    (unless (derived-mode-p 'org-mode)
+      (user-error "Not an Org buffer: %s" (buffer-name)))
+    (barf-if-buffer-read-only)
+    (org-with-wide-buffer
+     (goto-char marker)
+     (when (org-before-first-heading-p)
+       (user-error "Not on an Org entry")))
+    (pcase-let ((`(,start . ,end) (org-retroclock--read-times arg)))
+      (org-with-wide-buffer
+       (goto-char marker)
+       (org-retroclock--insert start end)))))
+
 ;;;###autoload
 (defun org-retroclock (arg)
   "Log a finished CLOCK entry on the Org entry at point.
 Without a prefix, read a duration and log the span ending now.  With
 prefix ARG, pin a start or end time first and log the span from there."
   (interactive "P" org-mode)
-  (barf-if-buffer-read-only)
-  (pcase-let ((`(,start . ,end) (org-retroclock--read-times arg)))
-    (org-with-wide-buffer
-     (org-retroclock--insert start end))))
+  (org-retroclock--log (point-marker) arg))
 
 ;;;###autoload
 (defun org-retroclock-recent (arg)
@@ -172,13 +189,7 @@ task Org remembers clocking, rather than the entry at point."
   (let ((marker (org-clock-select-task "Retro-clock which recent task? ")))
     (unless (and (markerp marker) (marker-buffer marker))
       (user-error "No task selected"))
-    (with-current-buffer (marker-buffer marker)
-      (barf-if-buffer-read-only))
-    (pcase-let ((`(,start . ,end) (org-retroclock--read-times arg)))
-      (with-current-buffer (marker-buffer marker)
-        (org-with-wide-buffer
-         (goto-char marker)
-         (org-retroclock--insert start end))))))
+    (org-retroclock--log marker arg)))
 
 (provide 'org-retroclock)
 ;;; org-retroclock.el ends here

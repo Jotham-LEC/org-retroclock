@@ -126,16 +126,6 @@
     (goto-char (point-min))
     (should (equal (org-clock-sum-current-item) 1800))))
 
-(ert-deftest org-retroclock-insert-refuses-to-work-before-the-first-heading ()
-  (let ((system-time-locale "C"))
-    (with-temp-buffer
-      (org-mode)
-      (insert "Preamble, no heading yet.\n")
-      (goto-char (point-min))
-      (should-error (org-retroclock--insert org-retroclock-test--start
-                                            org-retroclock-test--end)
-                    :type 'user-error))))
-
 (ert-deftest org-retroclock-push-history-is-customisable ()
   (org-retroclock-test--with-entry
     (let ((org-retroclock-push-history nil))
@@ -343,6 +333,28 @@ asked and CONFIRM is the symbol `never'."
         (org-retroclock-test--picking marker
           (org-retroclock-test--no-prompts
             (should-error (org-retroclock-recent nil) :type 'buffer-read-only)))))))
+
+(ert-deftest org-retroclock-refuses-the-preamble-before-prompting ()
+  (org-retroclock-test--with-entry
+    (insert "Preamble, no heading yet.\n")
+    (goto-char (point-min))
+    (org-retroclock-test--no-prompts
+      (should-error (org-retroclock nil) :type 'user-error))
+    (should-not (string-match-p org-clock-string (buffer-string)))))
+
+;; Outside Org mode the drawer used to go in, empty, and only then did
+;; the CLOCK line fail.
+(ert-deftest org-retroclock-refuses-a-buffer-not-in-org-mode ()
+  (with-temp-buffer
+    (insert "* Not Org\ntext\n")
+    (goto-char (point-min))
+    (org-retroclock-test--no-prompts
+      (should-error (org-retroclock nil) :type 'user-error)
+      (let ((marker (point-marker)))
+        (with-temp-buffer
+          (org-retroclock-test--picking marker
+            (should-error (org-retroclock-recent nil) :type 'user-error)))))
+    (should (equal (buffer-string) "* Not Org\ntext\n"))))
 
 (ert-deftest org-retroclock-recent-logs-on-the-picked-task ()
   (org-retroclock-test--with-entry
