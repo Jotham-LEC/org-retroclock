@@ -36,9 +36,9 @@
 ;;
 ;; `org-retroclock' acts on the entry at point.  `org-retroclock-recent'
 ;; offers the picker `org-clock-in' uses for recently clocked tasks, so the
-;; entry need not be on screen, or even in a buffer you have open.  The
-;; picker reads `org-clock-history', which Org forgets when Emacs exits
-;; unless `org-clock-persist' is set.
+;; entry need not be on screen.  The picker reads `org-clock-history',
+;; which holds a task only while its buffer is open, and which Org forgets
+;; when Emacs exits unless `org-clock-persist' is set.
 ;;
 ;; Both read a duration ("90", "90m", "1h30m" or "1:30") ending now.  A
 ;; trailing "m" means minutes, not Org's months.  With a prefix argument
@@ -77,18 +77,18 @@ START and END are Lisp timestamps.  Return the line's span and total."
                                     (org-time-string-to-time ts))))
            (hours (floor seconds 3600))
            (minutes (floor (mod seconds 3600) 60)))
-      ;; `org-clock-find-position' leaves point at the end of the line the
-      ;; entry belongs after, which is how `org-clock-in' opens its own line.
+      ;; `org-clock-find-position' leaves point at the start of the line the
+      ;; new one goes above.  Open a line there, as `org-clock-in' does.
       (insert-before-markers-and-inherit "\n")
       (backward-char 1)
       (insert-and-inherit org-clock-string " " ts "--" te " => "
                           (format "%2d:%02d" hours minutes))
       (org-indent-line)
       ;; A running clock on this entry shows the entry's total in the
-      ;; mode line, which has just grown.
+      ;; mode line, which has just grown.  With no clock running, the
+      ;; marker has no buffer.
       (org-back-to-heading t)
-      (when (and (org-clocking-p)
-                 (eq (marker-buffer org-clock-hd-marker)
+      (when (and (eq (marker-buffer org-clock-hd-marker)
                      (org-base-buffer (current-buffer)))
                  (= org-clock-hd-marker (point)))
         (setq org-clock-total-time

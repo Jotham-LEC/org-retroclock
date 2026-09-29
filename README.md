@@ -54,13 +54,16 @@ Emacs 29.1 or newer. Nothing beyond Org, which you already have.
 
 `M-x org-retroclock` logs against the Org entry at point. `M-x org-retroclock-recent`
 asks first which task, using the same picker `org-clock-in` offers for recently clocked
-tasks, so the entry need not be on screen or even in an open buffer. That picker reads
-`org-clock-history`, which Org forgets when Emacs exits. To keep it across sessions:
+tasks, so the entry need not be on screen. That picker reads `org-clock-history`, which
+holds a task only while its buffer is open and is gone when Emacs exits. To keep it
+across sessions:
 
 ```elisp
 (setq org-clock-persist 'history)
 (org-clock-persistence-insinuate)
 ```
+
+Org then reopens the files of the remembered tasks when it restores the history.
 
 Both then ask a duration — `90`, `90m`, `1h30m` or `1:30` — and log the span ending
 now. Org on its own reads `m` as months, so `90m` would be seven and a half years; here

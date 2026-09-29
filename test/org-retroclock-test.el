@@ -30,6 +30,12 @@
        (goto-char (point-min))
        ,@body)))
 
+(defmacro org-retroclock-test--at (time &rest body)
+  "Run BODY with the clock reading TIME."
+  (declare (indent 1))
+  `(cl-letf (((symbol-function 'current-time) (lambda () ,time)))
+     ,@body))
+
 (defun org-retroclock-test--clock-line ()
   "Return the buffer's CLOCK line, without indentation."
   (goto-char (point-min))
@@ -42,14 +48,80 @@
     (should (equal (org-retroclock-test--clock-line)
                    "CLOCK: [2026-09-24 Thu 09:00]--[2026-09-24 Thu 10:30] =>  1:30"))))
 
-(ert-deftest org-retroclock-insert-lands-inside-the-entry ()
+;; Org's own clock-in and clock-out are the oracle for where a line goes
+;; and what it says: each entry is logged both ways, and the buffers have
+;; to come out the same.
+(defconst org-retroclock-test--shapes
+  '(("bare" "* H\n" 0 nil)
+    ("no final newline" "* H" 0 nil)
+    ("planning and properties"
+     "* H\nSCHEDULED: <2026-09-24 Thu>\n:PROPERTIES:\n:ID: x\n:END:\nbody\n"
+     0 nil)
+    ("existing logbook"
+     "* H\n:LOGBOOK:\nCLOCK: [2026-09-01 Tue 08:00]--[2026-09-01 Tue 09:00] =>  1:00\n:END:\n"
+     0 nil)
+    ("no drawer, existing clock"
+     "* H\nCLOCK: [2026-09-01 Tue 08:00]--[2026-09-01 Tue 09:00] =>  1:00\nbody\n"
+     0 ((org-clock-into-drawer)))
+    ("drawer from two clocks"
+     "* H\nCLOCK: [2026-09-01 Tue 08:00]--[2026-09-01 Tue 09:00] =>  1:00\nbody\n"
+     0 ((org-clock-into-drawer . 2)))
+    ("notes, oldest first"
+     "* H\n:LOGBOOK:\n- Note taken on [2026-09-01 Tue 08:00] \\\\\n  text\n:END:\n"
+     0 ((org-log-states-order-reversed)))
+    ("no drawer, list before" "* H\n- item\n" 0 ((org-clock-into-drawer)))
+    ("adapted indentation" "** H\n" 0 ((org-adapt-indentation . t)))
+    ("child" "* H\n** C\n" 0 nil)
+    ("point in the body" "* H\nbody\nmore\n" 2 nil)
+    ("drawer named by property"
+     "* H\n:PROPERTIES:\n:CLOCK_INTO_DRAWER: TIMES\n:END:\n"
+     0 nil))
+  "Entries to clock: name, text, line of point, and variables to bind.")
+
+(defun org-retroclock-test--logged (text line clock)
+  "Return TEXT after CLOCK has logged the test span on line LINE."
+  (let ((system-time-locale "C")
+        (org-clock-history nil)
+        (org-clock-persist nil)
+        (org-clock-in-hook nil)
+        (org-clock-out-hook nil))
+    (with-temp-buffer
+      (org-mode)
+      (insert text)
+      (goto-char (point-min))
+      (forward-line line)
+      (funcall clock)
+      (buffer-substring-no-properties (point-min) (point-max)))))
+
+(ert-deftest org-retroclock-insert-writes-what-org-clock-in-and-out-write ()
+  (pcase-dolist (`(,name ,text ,line ,bindings) org-retroclock-test--shapes)
+    (cl-progv (mapcar #'car bindings) (mapcar #'cdr bindings)
+      (should (equal (list name
+                           (org-retroclock-test--logged
+                            text line
+                            (lambda ()
+                              (org-retroclock--insert org-retroclock-test--start
+                                                      org-retroclock-test--end))))
+                     (list name
+                           (org-retroclock-test--logged
+                            text line
+                            (lambda ()
+                              (org-retroclock-test--at org-retroclock-test--end
+                                (org-clock-in nil org-retroclock-test--start)
+                                (org-clock-out nil t org-retroclock-test--end))))))))))
+
+;; With no drawer and no body, the line goes in at the next heading, and
+;; a marker there, such as one in `org-clock-history', must stay on it.
+(ert-deftest org-retroclock-insert-leaves-the-next-heading-its-markers ()
   (org-retroclock-test--with-entry
-    (org-retroclock--insert org-retroclock-test--start org-retroclock-test--end)
-    (goto-char (point-min))
-    (re-search-forward (regexp-quote org-clock-string))
-    (should (equal (org-get-heading t t t t) "Write the tests"))
-    ;; Org's own reader has to agree that this is a clock line on this entry.
-    (should (equal (org-clock-sum-current-item) 90))))
+    (let ((org-clock-into-drawer nil)
+          (next (progn (goto-char (point-max))
+                       (insert "* Next\n")
+                       (copy-marker (line-beginning-position 0)))))
+      (goto-char (point-min))
+      (org-retroclock--insert org-retroclock-test--start org-retroclock-test--end)
+      (goto-char next)
+      (should (looking-at-p "\\* Next")))))
 
 (ert-deftest org-retroclock-insert-pads-hours-past-ten ()
   (org-retroclock-test--with-entry
@@ -85,39 +157,6 @@
       (org-retroclock--insert org-retroclock-test--start org-retroclock-test--end))
     (should (string-match-p ":CLOCKING:" (buffer-string)))))
 
-(ert-deftest org-retroclock-insert-goes-newest-first-in-an-existing-logbook ()
-  (org-retroclock-test--with-entry
-    (goto-char (point-max))
-    (insert ":LOGBOOK:\nCLOCK: [2026-09-01 Tue 08:00]--[2026-09-01 Tue 09:00] =>  1:00\n:END:\n")
-    (goto-char (point-min))
-    (org-retroclock--insert org-retroclock-test--start org-retroclock-test--end)
-    (should (string-match-p (concat "^:LOGBOOK:\n"
-                                    "CLOCK: \\[2026-09-24[^\n]*\n"
-                                    "CLOCK: \\[2026-09-01")
-                            (buffer-string)))
-    (goto-char (point-min))
-    (should (equal (org-clock-sum-current-item) 150))))
-
-(ert-deftest org-retroclock-insert-lands-after-a-properties-drawer ()
-  (org-retroclock-test--with-entry
-    (goto-char (point-max))
-    (insert "SCHEDULED: <2026-09-24 Thu>\n:PROPERTIES:\n:ID: x\n:END:\nbody\n")
-    (goto-char (point-min))
-    (org-retroclock--insert org-retroclock-test--start org-retroclock-test--end)
-    (should (string-match-p ":PROPERTIES:\n:ID: x\n:END:\n:LOGBOOK:\nCLOCK:" (buffer-string)))
-    (goto-char (point-min))
-    (should (equal (org-clock-sum-current-item) 90))))
-
-(ert-deftest org-retroclock-insert-clocks-the-entry-not-its-children ()
-  (org-retroclock-test--with-entry
-    (goto-char (point-max))
-    (insert "** Child\n")
-    (goto-char (point-min))
-    (org-retroclock--insert org-retroclock-test--start org-retroclock-test--end)
-    (goto-char (point-min))
-    (re-search-forward "^\\*\\* Child")
-    (should (equal (org-clock-sum-current-item) 0))))
-
 (ert-deftest org-retroclock-insert-handles-a-span-past-a-day ()
   (org-retroclock-test--with-entry
     (org-retroclock--insert org-retroclock-test--start
@@ -144,8 +183,9 @@
 ;; retroactive clock on the same entry adds to.
 (ert-deftest org-retroclock-insert-updates-the-running-clock-on-the-entry ()
   (org-retroclock-test--with-entry
-    (insert "* Other\n")
-    ;; Point is on the second entry, and the first is Other.
+    (save-excursion
+      (goto-char (point-max))
+      (insert "* Other\n"))
     (let ((org-clock-persist nil)
           (org-clock-in-hook nil)
           (org-clock-out-hook nil)
@@ -158,7 +198,7 @@
             (should (= org-clock-total-time 90))
             (should (string-match-p "1:30" org-mode-line-string))
             ;; A clock on another entry leaves the running one alone.
-            (goto-char (point-min))
+            (re-search-forward "^\\* Other")
             (org-retroclock--insert org-retroclock-test--start
                                     (time-add org-retroclock-test--start 1800))
             (should (= org-clock-total-time 90))
@@ -171,7 +211,14 @@
                 (goto-char place)
                 (org-retroclock--insert org-retroclock-test--start
                                         (time-add org-retroclock-test--start 1800))))
-            (should (= org-clock-total-time 90)))
+            (should (= org-clock-total-time 90))
+            ;; The total counts from where Org counts it, which for
+            ;; `current' is now.
+            (goto-char (marker-position org-clock-hd-marker))
+            (let ((org-clock-mode-line-total 'current))
+              (org-retroclock--insert org-retroclock-test--start
+                                      (time-add org-retroclock-test--start 1800)))
+            (should (= org-clock-total-time 0)))
         (org-clock-out nil t)))))
 
 (ert-deftest org-retroclock-says-what-it-logged ()
@@ -213,10 +260,6 @@ DATE is typed at Org's date prompt and DURATION at the duration prompt."
                                  ?e "2026-09-24 10:30" "90")))
     (should (time-equal-p start org-retroclock-test--start))
     (should (time-equal-p end org-retroclock-test--end))))
-
-(ert-deftest org-retroclock-rejects-a-non-positive-duration ()
-  (cl-letf (((symbol-function 'read-string) (lambda (&rest _) "0")))
-    (should-error (org-retroclock--read-times nil) :type 'user-error)))
 
 (ert-deftest org-retroclock-ignores-narrowing-to-the-heading-line ()
   (org-retroclock-test--with-entry
@@ -289,15 +332,10 @@ asked and CONFIRM is the symbol `never'."
     (should (string-prefix-p "Duration (90, 90m, 1h30m or 1:30)" prompt))))
 
 (ert-deftest org-retroclock-refuses-less-than-a-minute ()
+  (should-error (org-retroclock-test--read-duration "0" 'never) :type 'user-error)
   (should-error (org-retroclock-test--read-duration "0:00:30" 'never) :type 'user-error)
   (should-error (org-retroclock-test--read-duration "0.5" 'never) :type 'user-error)
   (should (= (org-retroclock-test--read-duration "1" 'never) 1)))
-
-(defmacro org-retroclock-test--at (time &rest body)
-  "Run BODY with the clock reading TIME."
-  (declare (indent 1))
-  `(cl-letf (((symbol-function 'current-time) (lambda () ,time)))
-     ,@body))
 
 (ert-deftest org-retroclock-refuses-an-end-in-the-future ()
   (org-retroclock-test--at (encode-time '(0 0 10 24 9 2026 nil -1 nil))
@@ -355,6 +393,10 @@ asked and CONFIRM is the symbol `never'."
                  (if (string-prefix-p "Duration" prompt) "30" "-fri"))))
       (org-retroclock--read-times t))
     (should (cl-some (lambda (p) (string-match-p "-fri for last Friday" p))
+                     prompts))
+    ;; And Org is asked for a time as well as a date, so its default
+    ;; shows one.
+    (should (cl-some (lambda (p) (string-match-p "\\[[^]]* [0-9]+:[0-9]+\\]" p))
                      prompts))))
 
 ;; `org-current-time' rounds by `org-time-stamp-rounding-minutes', which
@@ -377,12 +419,20 @@ asked and CONFIRM is the symbol `never'."
      ,@body))
 
 (defmacro org-retroclock-test--picking (marker &rest body)
-  "Run BODY with `org-clock-select-task' returning MARKER."
+  "Run BODY with `org-clock-select-task' returning MARKER.
+The history file stays unread, but the picker fails the test if it is
+called before `org-clock-load' would have read it."
   (declare (indent 1))
-  `(cl-letf (((symbol-function 'org-clock-load) #'ignore)
-             ((symbol-function 'org-clock-select-task)
-              (lambda (&rest _) ,marker)))
-     ,@body))
+  (let ((loaded (make-symbol "loaded")))
+    `(let ((,loaded nil))
+       (cl-letf (((symbol-function 'org-clock-load)
+                  (lambda () (setq ,loaded t)))
+                 ((symbol-function 'org-clock-select-task)
+                  (lambda (&rest _)
+                    (unless ,loaded
+                      (ert-fail "The history was not loaded first"))
+                    ,marker)))
+         ,@body))))
 
 (ert-deftest org-retroclock-refuses-a-read-only-buffer-before-prompting ()
   (org-retroclock-test--with-entry
@@ -420,6 +470,16 @@ asked and CONFIRM is the symbol `never'."
           (org-retroclock-test--picking marker
             (should-error (org-retroclock-recent nil) :type 'user-error)))))
     (should (equal (buffer-string) "* Not Org\ntext\n"))))
+
+(ert-deftest org-retroclock-recent-refuses-no-pick ()
+  (org-retroclock-test--picking nil
+    (org-retroclock-test--no-prompts
+      (should-error (org-retroclock-recent nil) :type 'user-error)))
+  ;; A task whose buffer has since been killed.
+  (let ((marker (with-temp-buffer (point-marker))))
+    (org-retroclock-test--picking marker
+      (org-retroclock-test--no-prompts
+        (should-error (org-retroclock-recent nil) :type 'user-error)))))
 
 (ert-deftest org-retroclock-recent-logs-on-the-picked-task ()
   (org-retroclock-test--with-entry
