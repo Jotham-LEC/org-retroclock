@@ -28,6 +28,11 @@ All notable changes to org-retroclock are documented here. The format is based o
 - A time range such as `9:00-10:30` at the date prompt is refused. Org read it as the
   current time, so `-1 9:00-10:30` for the end logged a span ending yesterday at this
   hour.
+- A span whose `CLOCK:` line would total no time or less is refused before anything is
+  written. Org's timestamps carry no time zone, so across the autumn clock change half
+  an hour ending at 02:15 the second time was written `[02:45]--[02:15] => -1:30`, as
+  `org-clock-out` writes it. A span across the change that comes out forwards is still
+  logged as Org logs it.
 - `org-retroclock-recent` says there is no recent task in an open buffer, instead of
   bringing up Org's picker with nothing in it, when every remembered task's buffer has
   been killed.

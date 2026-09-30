@@ -400,6 +400,70 @@ asked and CONFIRM is the symbol `never'."
     (should-error (org-retroclock-test--read-anchored ?e "2026-09-24 10:31" "30")
                   :type 'user-error)))
 
+;; `setenv' passes TZ on to `set-time-zone-rule', both ways.
+(defmacro org-retroclock-test--in-zone (zone &rest body)
+  "Run BODY in the time zone ZONE, such as \"Europe/Berlin\"."
+  (declare (indent 1))
+  (let ((old (make-symbol "old")))
+    `(let ((,old (getenv "TZ")))
+       (unwind-protect
+           (progn (setenv "TZ" ,zone)
+                  ,@body)
+         (setenv "TZ" ,old)))))
+
+;; Berlin's clocks went back from 03:00 to 02:00 on 26 October 2025.
+;; Thirty minutes before 02:15 the second time is 02:45 the first, and an
+;; hour before it 02:15 the first, which CLOCK lines total as -0:30 and
+;; 0:00, as `org-clock-out' would.  A time in that hour is ambiguous and
+;; `encode-time' picks either, so the ends are given with their offsets,
+;; as a clock that reads now would give them.
+(ert-deftest org-retroclock-refuses-a-span-the-clock-change-turns-back ()
+  (org-retroclock-test--in-zone "Europe/Berlin"
+    (let ((org-clock-rounding-minutes 0))
+      (dolist (duration '("30" "60"))
+        (org-retroclock-test--with-entry
+          (org-retroclock-test--at (encode-time '(0 15 2 26 10 2025 nil nil 3600))
+            (cl-letf (((symbol-function 'read-string) (lambda (&rest _) duration)))
+              (should (string-match-p
+                       "clocks go back"
+                       (error-message-string
+                        (should-error (org-retroclock nil) :type 'user-error))))))
+          (should (equal (buffer-string) "* Write the tests\n"))
+          (should-not org-clock-history))))))
+
+;; A span across the change whose stamps still come out forwards is
+;; logged, and as Org logs it.
+(ert-deftest org-retroclock-logs-a-span-across-the-clock-change-as-org-does ()
+  (org-retroclock-test--in-zone "Europe/Berlin"
+    (org-retroclock-test--at (encode-time '(0 0 12 27 10 2025 nil -1 nil))
+      (pcase-dolist (`(,anchor ,date ,duration ,start ,end)
+                     '((?s "2025-10-26 01:30" "150"
+                           (0 30 1 26 10 2025 nil t 7200) (0 0 3 26 10 2025 nil nil 3600))
+                       (?e "2025-10-26 03:30" "180"
+                           (0 30 1 26 10 2025 nil t 7200) (0 30 3 26 10 2025 nil nil 3600))))
+        (let ((logged (org-retroclock-test--logged
+                       "* H\n" 0
+                       (lambda ()
+                         (cl-letf (((symbol-function 'read-char-choice)
+                                    (lambda (&rest _) anchor))
+                                   ((symbol-function 'read-string)
+                                    (lambda (prompt &rest _)
+                                      (if (string-prefix-p "Duration" prompt)
+                                          duration
+                                        date))))
+                           (org-retroclock '(4)))))))
+          (should (string-match-p (format "=>  %d:%02d$"
+                                          (/ (string-to-number duration) 60)
+                                          (% (string-to-number duration) 60))
+                                  logged))
+          (should (equal logged
+                         (org-retroclock-test--logged
+                          "* H\n" 0
+                          (lambda ()
+                            (org-retroclock-test--at (encode-time end)
+                              (org-clock-in nil (encode-time start))
+                              (org-clock-out nil t (encode-time end))))))))))))
+
 (defun org-retroclock-test--day (days)
   "Return noon DAYS days from today, going back for a negative DAYS.
 Days are counted on the calendar, since 86400 seconds before late on

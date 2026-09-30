@@ -73,7 +73,9 @@ there: `s` for an hour you started at nine this morning, `e` for a meeting that 
 at six. A date without a year reads as the past one, so `25 14:00` is the 25th just
 gone; a weekday does not, since Org reads `fri` as the coming Friday whatever it is
 told, so type `-fri` for last Friday. Less than a minute, or a span that ends in the
-future, is refused. More than a day asks first.
+future, is refused. More than a day asks first. Org's timestamps carry no time zone,
+so a span across the autumn clock change that would be written backwards, such as
+`[02:45]--[02:15]`, is refused too, before anything is written.
 
 Nothing is bound out of the box, because where these belong depends on where your other
 Org clock keys are:

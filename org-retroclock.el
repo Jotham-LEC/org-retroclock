@@ -47,6 +47,8 @@
 ;; that ended at six are equally easy to say.  A date without a year is
 ;; read as the past one, and "-fri" is last Friday.  A span under a minute
 ;; or ending in the future is refused, and one over a day asks first.
+;; Org's timestamps carry no time zone, so a span whose stamps would come
+;; out backwards across the autumn clock change is refused too.
 ;;
 ;; No keys are bound.  Bind the two commands wherever your Org keys live:
 ;;
@@ -58,6 +60,19 @@
 (require 'org)
 (require 'org-clock)
 
+(defun org-retroclock--stamps (start end)
+  "Return the list (TS TE SECONDS) of a CLOCK line from START to END.
+TS and TE are the line's two stamps and SECONDS its total.  The total
+is worked out from the stamps, as `org-clock-out' works out its own, so
+that it agrees with what the line says.  A stamp carries no time zone,
+so across the autumn clock change SECONDS can be zero or negative."
+  (let* ((stamp (org-time-stamp-format t t))
+         (ts (format-time-string stamp start))
+         (te (format-time-string stamp end)))
+    (list ts te (org-time-convert-to-integer
+                 (time-subtract (org-time-string-to-time te)
+                                (org-time-string-to-time ts))))))
+
 (defun org-retroclock--insert (start end)
   "Insert a finished CLOCK line spanning START to END on the entry at point.
 START and END are Lisp timestamps.  Return the line's span and total."
@@ -67,16 +82,9 @@ START and END are Lisp timestamps.  Return the line's span and total."
     ;; `org-clock-in' makes it.
     (org-clock-history-push)
     (org-clock-find-position nil)
-    (let* ((stamp (org-time-stamp-format t t))
-           (ts (format-time-string stamp start))
-           (te (format-time-string stamp end))
-           ;; The total is worked out from the stamps, as `org-clock-out'
-           ;; works out its own, so that it agrees with what the line says.
-           (seconds (org-time-convert-to-integer
-                     (time-subtract (org-time-string-to-time te)
-                                    (org-time-string-to-time ts))))
-           (hours (floor seconds 3600))
-           (minutes (floor (mod seconds 3600) 60)))
+    (pcase-let* ((`(,ts ,te ,seconds) (org-retroclock--stamps start end))
+                 (hours (floor seconds 3600))
+                 (minutes (floor (mod seconds 3600) 60)))
       ;; `org-clock-find-position' leaves point at the start of the line the
       ;; new one goes above.  Open a line there, as `org-clock-in' does.
       (insert-before-markers-and-inherit "\n")
@@ -149,7 +157,8 @@ When ANCHORED is nil the span is a duration ending now, rounded down
 by `org-clock-rounding-minutes' as `org-clock-in' would.  Otherwise ask
 which end to pin, read that time, and read the duration from there.
 A span that ends more than a minute from now is refused: this logs work
-already done."
+already done.  So is one whose CLOCK line would total no time or less,
+which the stamps of a span across the autumn clock change can."
   (let ((span
          (if (not anchored)
              (let* ((minutes (org-retroclock--read-duration))
@@ -165,6 +174,14 @@ already done."
     (when (time-less-p (time-add (current-time) 60) (cdr span))
       (user-error "That span ends in the future, at %s; for last Friday type -fri"
                   (format-time-string (org-time-stamp-format t t) (cdr span))))
+    ;; Org's stamps carry no time zone, so when the clocks go back an
+    ;; hour a span can end at an earlier stamp than it starts, and
+    ;; `org-clock-out' would total it as negative.
+    (pcase-let ((`(,ts ,te ,seconds) (org-retroclock--stamps (car span) (cdr span))))
+      (when (<= seconds 0)
+        (user-error "The clocks go back in between, so %s--%s would total %d \
+minutes: Org's timestamps carry no time zone"
+                    ts te (/ seconds 60))))
     span))
 
 ;; Both commands come through here, so that everything that can refuse
