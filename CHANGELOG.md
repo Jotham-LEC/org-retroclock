@@ -6,7 +6,30 @@ All notable changes to org-retroclock are documented here. The format is based o
 
 ## [Unreleased]
 
-## [0.1.2] — 2026-09-29
+## [0.2.0] — 2026-09-30
+
+### Added
+- A range typed at the date prompt, such as `9:00-10:30`, `-1 9:00-10:30` or
+  `2pm-3:30pm`, is the whole span, and no duration is asked. Org read a range there as
+  the current time, so `-1 9:00-10:30` for the end logged a span ending yesterday at
+  this hour. Org reads both ends of a range on the day it starts, so `22:00-01:00`
+  ends before it starts and is refused, with a pointer to pinning the end and typing a
+  duration instead; Org's `22:00+3` ends the next day. A range whose start Org drops,
+  as in `9am-10:30`, is refused. A range is checked as any span: not in the future,
+  not backwards, and more than a day asks first.
+- Both commands echo the line they wrote and the entry it went on.
+
+### Changed
+- `make check` runs byte-compilation with all warnings as errors (tests included),
+  checkdoc, package-lint, relint, a format check and the tests; CI runs it on Emacs
+  29.1, 30.1, 31.1 and a snapshot.
+- The README and commentary no longer claim a picked task need not be in an open
+  buffer: `org-clock-history` drops a task along with its buffer.
+
+### Removed
+- `org-retroclock-push-history`. A retroactive clock always joins `org-clock-history`,
+  as `org-clock-in` always adds the task it clocks. A leftover `setq` of the option
+  does nothing and can be deleted.
 
 ### Fixed
 - The `=>` total is worked out from the two timestamps as written, as `org-clock-out`
@@ -33,29 +56,6 @@ All notable changes to org-retroclock are documented here. The format is based o
 - `org-retroclock-recent` says there is no recent task in an open buffer, instead of
   bringing up Org's picker with nothing in it, when every remembered task's buffer has
   been killed.
-
-### Added
-- A range typed at the date prompt, such as `9:00-10:30`, `-1 9:00-10:30` or
-  `2pm-3:30pm`, is the whole span, and no duration is asked. Org read a range there as
-  the current time, so `-1 9:00-10:30` for the end logged a span ending yesterday at
-  this hour. Org reads both ends of a range on the day it starts, so `22:00-01:00`
-  ends before it starts and is refused, with a pointer to pinning the end and typing a
-  duration instead; Org's `22:00+3` ends the next day. A range whose start Org drops,
-  as in `9am-10:30`, is refused. A range is checked as any span: not in the future,
-  not backwards, and more than a day asks first.
-- Both commands echo the line they wrote and the entry it went on.
-
-### Removed
-- `org-retroclock-push-history`. A retroactive clock always joins `org-clock-history`,
-  as `org-clock-in` always adds the task it clocks. A leftover `setq` of the option
-  does nothing and can be deleted.
-
-### Changed
-- `make check` runs byte-compilation with all warnings as errors (tests included),
-  checkdoc, package-lint, relint, a format check and the tests; CI runs it on Emacs
-  29.1, 30.1, 31.1 and a snapshot.
-- The README and commentary no longer claim a picked task need not be in an open
-  buffer: `org-clock-history` drops a task along with its buffer.
 
 ## [0.1.1] — 2026-09-28
 
@@ -89,7 +89,7 @@ in daily use.
 - **`org-retroclock-push-history`** (default `t`) decides whether a retroactive clock
   joins `org-clock-history` and so turns up in those pickers later.
 
-[Unreleased]: https://github.com/Jotham-LEC/org-retroclock/compare/v0.1.2...HEAD
-[0.1.2]: https://github.com/Jotham-LEC/org-retroclock/compare/v0.1.1...v0.1.2
+[Unreleased]: https://github.com/Jotham-LEC/org-retroclock/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Jotham-LEC/org-retroclock/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/Jotham-LEC/org-retroclock/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Jotham-LEC/org-retroclock/releases/tag/v0.1.0
