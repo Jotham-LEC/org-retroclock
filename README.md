@@ -70,12 +70,18 @@ now. Org on its own reads `m` as months, so `90m` would be seven and a half year
 it means minutes. With a prefix argument they ask which end of the span to
 pin instead, read that time through `org-read-date`, and measure the duration from
 there: `s` for an hour you started at nine this morning, `e` for a meeting that ended
-at six. A date without a year reads as the past one, so `25 14:00` is the 25th just
-gone; a weekday does not, since Org reads `fri` as the coming Friday whatever it is
-told, so type `-fri` for last Friday. Less than a minute, or a span that ends in the
-future, is refused. More than a day asks first. Org's timestamps carry no time zone,
-so a span across the autumn clock change that would be written backwards, such as
-`[02:45]--[02:15]`, is refused too, before anything is written.
+at six. Or type the whole span there as a range, such as `9:00-10:30`,
+`-1 2pm-3:30pm` or `-fri 14:00-15:30`, and no duration is asked; either end will do.
+Org reads both ends of a range on the day it starts, so `22:00-01:00` ends before it
+starts and is refused: to log a span past midnight, pin the end and type a duration.
+Org's own `22:00+3` does reach into the next day. Write both times alike: Org reads no
+start time in `9am-10:30`, so that is refused too. A date without a year reads as the
+past one, so `25 14:00` is the 25th just gone; a weekday does not, since Org reads
+`fri` as the coming Friday whatever it is told, so type `-fri` for last Friday. Less
+than a minute, or a span that ends in the future, is refused. More than a day asks
+first. Org's timestamps carry no time zone, so a span across the autumn clock change
+that would be written backwards, such as `[02:45]--[02:15]`, is refused too, before
+anything is written.
 
 Nothing is bound out of the box, because where these belong depends on where your other
 Org clock keys are:

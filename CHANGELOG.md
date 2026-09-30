@@ -25,9 +25,6 @@ All notable changes to org-retroclock are documented here. The format is based o
   inside Org.
 - Logging on the task being clocked, or on any entry below it, updates its total in the
   mode line, which counts the whole subtree.
-- A time range such as `9:00-10:30` at the date prompt is refused. Org read it as the
-  current time, so `-1 9:00-10:30` for the end logged a span ending yesterday at this
-  hour.
 - A span whose `CLOCK:` line would total no time or less is refused before anything is
   written. Org's timestamps carry no time zone, so across the autumn clock change half
   an hour ending at 02:15 the second time was written `[02:45]--[02:15] => -1:30`, as
@@ -38,6 +35,14 @@ All notable changes to org-retroclock are documented here. The format is based o
   been killed.
 
 ### Added
+- A range typed at the date prompt, such as `9:00-10:30`, `-1 9:00-10:30` or
+  `2pm-3:30pm`, is the whole span, and no duration is asked. Org read a range there as
+  the current time, so `-1 9:00-10:30` for the end logged a span ending yesterday at
+  this hour. Org reads both ends of a range on the day it starts, so `22:00-01:00`
+  ends before it starts and is refused, with a pointer to pinning the end and typing a
+  duration instead; Org's `22:00+3` ends the next day. A range whose start Org drops,
+  as in `9am-10:30`, is refused. A range is checked as any span: not in the future,
+  not backwards, and more than a day asks first.
 - Both commands echo the line they wrote and the entry it went on.
 
 ### Removed

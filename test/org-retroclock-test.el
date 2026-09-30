@@ -521,25 +521,96 @@ the day the clocks go back is still that day."
 
 ;; Org reads "9:00-10:30" as a range only for a caller that asks for
 ;; one, and otherwise as the current time, so that span logged yesterday
-;; afternoon instead of yesterday morning.
-(ert-deftest org-retroclock-refuses-a-range-at-the-date-prompt ()
+;; afternoon instead of yesterday morning.  A range is now the span.
+(defun org-retroclock-test--read-range (anchor date &optional confirm)
+  "Return `org-retroclock--read-times' for ANCHOR and DATE, a range.
+The test fails if the duration is asked.  CONFIRM answers `y-or-n-p'."
+  (cl-letf (((symbol-function 'read-char-choice) (lambda (&rest _) anchor))
+            ((symbol-function 'y-or-n-p) (lambda (&rest _) confirm))
+            ((symbol-function 'read-string)
+             (lambda (prompt &rest _)
+               (when (string-prefix-p "Duration" prompt)
+                 (ert-fail "The duration was asked for a range"))
+               date)))
+    (org-retroclock--read-times t)))
+
+(ert-deftest org-retroclock-reads-a-range-as-the-span ()
   (dolist (anchor '(?s ?e))
-    (let (asked)
-      (cl-letf (((symbol-function 'read-char-choice) (lambda (&rest _) anchor))
+    (dolist (date '("2026-09-24 9:00-10:30" "2026-09-24 9am-10:30am"
+                    "2026-09-24 9:00-10:30am" "2026-09-24 9:00+1:30"
+                    "2026-09-24 9h-10h30" "24.9.2026 9:00-10:30"))
+      (pcase-let ((`(,start . ,end) (org-retroclock-test--read-range anchor date)))
+        (should (equal (list date (format-time-string "%F %T" start)
+                             (format-time-string "%F %T" end))
+                       (list date "2026-09-24 09:00:00" "2026-09-24 10:30:00"))))))
+  ;; A relative date is read as it is for a single time.
+  (pcase-let* ((`(,_ ,_ ,_ ,day ,month ,year . ,_) (org-retroclock-test--days-ago 1))
+               (`(,start . ,end) (org-retroclock-test--read-range ?e "-1 2pm-3:30pm")))
+    (should (time-equal-p start (encode-time (list 0 0 14 day month year nil -1 nil))))
+    (should (time-equal-p end (encode-time (list 0 30 15 day month year nil -1 nil))))))
+
+(ert-deftest org-retroclock-logs-a-range-typed-at-the-date-prompt ()
+  (org-retroclock-test--with-entry
+    (cl-letf (((symbol-function 'read-char-choice) (lambda (&rest _) ?e))
+              ((symbol-function 'read-string)
+               (lambda (prompt &rest _)
+                 (when (string-prefix-p "Duration" prompt)
+                   (ert-fail "The duration was asked for a range"))
+                 "2026-09-24 9:00-10:30")))
+      (org-retroclock '(4)))
+    (should (equal (org-retroclock-test--clock-line)
+                   "CLOCK: [2026-09-24 Thu 09:00]--[2026-09-24 Thu 10:30] =>  1:30"))))
+
+;; Org reads both ends of a range on the day it starts, so "22:00-01:00"
+;; ends before it starts; its own "22:00+3" ends at "25:00", which is
+;; the next day.
+(ert-deftest org-retroclock-refuses-a-range-that-ends-before-it-starts ()
+  (dolist (date '("2026-09-24 22:00-01:00" "2026-09-24 9:00-9:00"))
+    (org-retroclock-test--with-entry
+      (cl-letf (((symbol-function 'read-char-choice) (lambda (&rest _) ?s))
                 ((symbol-function 'read-string)
                  (lambda (prompt &rest _)
-                   (if (string-prefix-p "Duration" prompt)
-                       (progn (setq asked t) "90")
-                     "-1 9:00-10:30"))))
+                   (when (string-prefix-p "Duration" prompt)
+                     (ert-fail "The duration was asked for a range"))
+                   date)))
         (should (string-match-p
-                 "not a range"
+                 "pin the end and type a duration"
                  (error-message-string
-                  (should-error (org-retroclock--read-times t) :type 'user-error))))
-        (should-not asked))))
-  ;; A single time is still read.
-  (pcase-let ((`(,start . ,_) (org-retroclock-test--read-anchored
-                               ?s "2026-09-24 09:00" "90")))
-    (should (time-equal-p start org-retroclock-test--start))))
+                  (should-error (org-retroclock '(4)) :type 'user-error)))))
+      (should (equal (buffer-string) "* Write the tests\n"))))
+  (pcase-let ((`(,start . ,end) (org-retroclock-test--read-range ?s "2026-09-24 22:00+3")))
+    (should (equal (format-time-string "%F %R" start) "2026-09-24 22:00"))
+    (should (equal (format-time-string "%F %R" end) "2026-09-25 01:00"))))
+
+;; Org reads "9am-10:30" as a range, but without its start, which it
+;; takes from the current time.
+(ert-deftest org-retroclock-refuses-a-range-whose-start-org-drops ()
+  (should (string-match-p
+           "no start time"
+           (error-message-string
+            (should-error (org-retroclock-test--read-range ?s "2026-09-24 9am-10:30")
+                          :type 'user-error)))))
+
+(ert-deftest org-retroclock-checks-a-range-as-any-span ()
+  (org-retroclock-test--at (encode-time '(0 0 10 24 9 2026 nil -1 nil))
+    (should-error (org-retroclock-test--read-range ?s "2026-09-24 9:00-10:30")
+                  :type 'user-error)
+    (should (org-retroclock-test--read-range ?s "2026-09-24 9:00-10:00")))
+  (should-error (org-retroclock-test--read-range ?s "2026-09-24 1:00+25" nil)
+                :type 'user-error)
+  (pcase-let ((`(,start . ,end)
+               (org-retroclock-test--read-range ?s "2026-09-24 1:00+25" t)))
+    (should (= (float-time (time-subtract end start)) (* 25 3600)))))
+
+(ert-deftest org-retroclock-prompt-offers-a-range ()
+  (let (prompts)
+    (cl-letf (((symbol-function 'read-char-choice) (lambda (&rest _) ?s))
+              ((symbol-function 'read-string)
+               (lambda (prompt &rest _)
+                 (push prompt prompts)
+                 "2026-09-24 9:00-10:30")))
+      (org-retroclock--read-times t))
+    (should (string-match-p "range such as 9:00-10:30" (car (last prompts))))))
 
 ;; `org-current-time' rounds by `org-time-stamp-rounding-minutes', which
 ;; can put "now" minutes in the past and refuse the present as the future.

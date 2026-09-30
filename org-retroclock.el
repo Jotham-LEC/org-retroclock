@@ -44,7 +44,11 @@
 ;; trailing "m" means minutes, not Org's months.  With a prefix argument
 ;; they first ask which end of the span you want to pin, then read that
 ;; time and the duration, so an hour you spent this morning and a meeting
-;; that ended at six are equally easy to say.  A date without a year is
+;; that ended at six are equally easy to say.  Type a range for that
+;; time, such as "9:00-10:30" or "-1 2pm-3:30pm", and it is the whole
+;; span, with no duration asked.  Org reads both ends of a range on one
+;; day, so "22:00-01:00" ends before it starts and is refused; to cross
+;; midnight, pin the end and type a duration.  A date without a year is
 ;; read as the past one, and "-fri" is last Friday.  A span under a minute
 ;; or ending in the future is refused, and one over a day asks first.
 ;; Org's timestamps carry no time zone, so a span whose stamps would come
@@ -127,61 +131,106 @@ of more than a day has to be confirmed."
             (user-error "Not a duration: %S" typed))))
     (when (< minutes 1)
       (user-error "Duration must be at least a minute"))
-    (when (and (> minutes (* 24 60))
-               (not (y-or-n-p (format "Log %s, more than a day? "
-                                      (org-duration-from-minutes minutes)))))
-      (user-error "Not logged"))
+    (org-retroclock--confirm-long minutes)
     ;; A CLOCK line has no seconds, so neither does the span.
     (round minutes)))
 
+(defun org-retroclock--confirm-long (minutes)
+  "Ask before logging MINUTES when that is more than a day.
+Signal a `user-error' when the answer is no."
+  (when (and (> minutes (* 24 60))
+             (not (y-or-n-p (format "Log %s, more than a day? "
+                                    (org-duration-from-minutes minutes)))))
+    (user-error "Not logged")))
+
+(defvar org-time-was-given)
 (defvar org-end-time-was-given)
 
 (defun org-retroclock--read-date (prompt)
-  "Read a date and time with PROMPT, taking a date without a year as past.
-Org reads a bare weekday forwards however it is told, so the prompt
-also mentions \"-fri\", which Org reads as last Friday.  A time range
-such as \"9:00-10:30\" is refused: the duration is asked next."
+  "Read a date and a time, or a range of times, with PROMPT.
+Return the cons (START . END).  END is nil for a single time, and for a
+range such as \"9:00-10:30\" or \"2pm-3:30pm\" it is the range's end,
+on the day the range starts, as Org reads it: \"22:00-01:00\" ends
+before it starts.  Org's \"22:00+3\" ends the next day.
+
+A date without a year is taken as past.  Org reads a bare weekday
+forwards however it is told, so the prompt also mentions \"-fri\",
+which Org reads as last Friday."
   ;; Org reads a range only for a caller that binds
   ;; `org-end-time-was-given', and otherwise drops the typed time
   ;; altogether and uses the current one.
   (let* ((org-read-date-prefer-future nil)
+         (org-time-was-given nil)
          (org-end-time-was-given nil)
-         (time (org-read-date t t nil (concat prompt " (-fri for last Friday)"))))
-    (when org-end-time-was-given
-      (user-error "Type one time, not a range; the duration is asked next"))
-    time))
+         (start (org-read-date t t nil (concat prompt " (or a range such as 9:00-10:30; \
+-fri for last Friday)")))
+         (end org-end-time-was-given))
+    (cond
+     ((not end) (list start))
+     ;; Org takes a range from "9am-10:30" but not the start, and uses
+     ;; the current time instead.
+     ((not org-time-was-given)
+      (user-error "Org read no start time in that range; write both times alike, \
+as 9:00-10:30 or 9am-10:30am"))
+     ;; Org writes the end as it would in a timestamp, where "22:00+3"
+     ;; ends at "25:00".
+     ((string-match "\\`\\([0-9]+\\):\\([0-5][0-9]\\)\\'" end)
+      (let ((day (decode-time start)))
+        (cons start
+              (encode-time (list 0 (string-to-number (match-string 2 end))
+                                 (string-to-number (match-string 1 end))
+                                 (decoded-time-day day) (decoded-time-month day)
+                                 (decoded-time-year day) nil -1 nil)))))
+     (t (user-error "Cannot read the end of that range: %s" end)))))
 
 (defun org-retroclock--read-times (anchored)
   "Return the cons (START . END) of a span read from the minibuffer.
 When ANCHORED is nil the span is a duration ending now, rounded down
 by `org-clock-rounding-minutes' as `org-clock-in' would.  Otherwise ask
-which end to pin, read that time, and read the duration from there.
-A span that ends more than a minute from now is refused: this logs work
-already done.  So is one whose CLOCK line would total no time or less,
-which the stamps of a span across the autumn clock change can."
-  (let ((span
-         (if (not anchored)
-             (let* ((minutes (org-retroclock--read-duration))
-                    (end (org-current-time org-clock-rounding-minutes t)))
-               (cons (time-subtract end (seconds-to-time (* minutes 60))) end))
-           (pcase (read-char-choice "Anchor: [s]tart time  [e]nd time: " '(?s ?e))
-             (?s (let* ((start (org-retroclock--read-date "Start time"))
-                        (minutes (org-retroclock--read-duration)))
-                   (cons start (time-add start (seconds-to-time (* minutes 60))))))
-             (?e (let* ((end (org-retroclock--read-date "End time"))
-                        (minutes (org-retroclock--read-duration)))
-                   (cons (time-subtract end (seconds-to-time (* minutes 60))) end)))))))
+which end to pin, read that time, and read the duration from there;
+a range typed for that time is the whole span, and no duration is
+asked.  A span that ends more than a minute from now is refused: this
+logs work already done.  So is one whose CLOCK line would total no time
+or less, as a range that ends before it starts would, and as the stamps
+of a span across the autumn clock change can."
+  (let* ((range nil)
+         (span
+          (if (not anchored)
+              (let* ((minutes (org-retroclock--read-duration))
+                     (end (org-current-time org-clock-rounding-minutes t)))
+                (cons (time-subtract end (seconds-to-time (* minutes 60))) end))
+            (let* ((anchor (read-char-choice "Anchor: [s]tart time  [e]nd time: "
+                                             '(?s ?e)))
+                   (typed (org-retroclock--read-date
+                           (if (eq anchor ?s) "Start time" "End time"))))
+              (cond
+               ((cdr typed) (setq range t) typed)
+               ((eq anchor ?s)
+                (let ((minutes (org-retroclock--read-duration)))
+                  (cons (car typed) (time-add (car typed) (seconds-to-time (* minutes 60))))))
+               (t
+                (let ((minutes (org-retroclock--read-duration)))
+                  (cons (time-subtract (car typed) (seconds-to-time (* minutes 60)))
+                        (car typed)))))))))
     (when (time-less-p (time-add (current-time) 60) (cdr span))
       (user-error "That span ends in the future, at %s; for last Friday type -fri"
                   (format-time-string (org-time-stamp-format t t) (cdr span))))
-    ;; Org's stamps carry no time zone, so when the clocks go back an
-    ;; hour a span can end at an earlier stamp than it starts, and
-    ;; `org-clock-out' would total it as negative.
     (pcase-let ((`(,ts ,te ,seconds) (org-retroclock--stamps (car span) (cdr span))))
-      (when (<= seconds 0)
+      (cond
+       ;; Org reads both ends of a range on the day it starts.
+       ((not (time-less-p (car span) (cdr span)))
+        (user-error "That range ends at %s, not after it starts: Org reads both \
+times on one day; to cross midnight, pin the end and type a duration" te))
+       ;; Org's stamps carry no time zone, so when the clocks go back an
+       ;; hour a span can end at an earlier stamp than it starts, and
+       ;; `org-clock-out' would total it as negative.
+       ((<= seconds 0)
         (user-error "The clocks go back in between, so %s--%s would total %d \
 minutes: Org's timestamps carry no time zone"
-                    ts te (/ seconds 60))))
+                    ts te (/ seconds 60)))))
+    (when range
+      (org-retroclock--confirm-long
+       (/ (float-time (time-subtract (cdr span) (car span))) 60)))
     span))
 
 ;; Both commands come through here, so that everything that can refuse
@@ -209,7 +258,8 @@ is refused before anything is asked."
 (defun org-retroclock (arg)
   "Log a finished CLOCK entry on the Org entry at point.
 Without a prefix, read a duration and log the span ending now.  With
-prefix ARG, pin a start or end time first and log the span from there."
+prefix ARG, pin a start or end time first and log the span from there,
+or type a range such as \"9:00-10:30\" for that time and log it."
   (interactive "P" org-mode)
   (org-retroclock--log (point-marker) arg))
 
