@@ -74,9 +74,9 @@ so across the autumn clock change SECONDS can be zero or negative."
   (let* ((stamp (org-time-stamp-format t t))
          (ts (format-time-string stamp start))
          (te (format-time-string stamp end)))
-    (list ts te (org-time-convert-to-integer
-                 (time-subtract (org-time-string-to-time te)
-                                (org-time-string-to-time ts))))))
+    (list ts te (time-convert (time-subtract (org-time-string-to-time te)
+                                             (org-time-string-to-time ts))
+                              'integer))))
 
 (defun org-retroclock--next-heading-markers ()
   "Return Org's clock markers at the heading after the entry at point.
