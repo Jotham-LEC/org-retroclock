@@ -6,6 +6,10 @@ All notable changes to org-retroclock are documented here. The format is based o
 
 ## [Unreleased]
 
+### Changed
+- `Package-Requires` names Org 9.6.6, the version Emacs 29.1 ships, so nothing new
+  is installed; melpazoid asks an `org-` package to say it depends on Org.
+
 ## [0.2.0] — 2026-09-30
 
 ### Added
