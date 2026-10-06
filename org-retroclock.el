@@ -78,6 +78,23 @@ so across the autumn clock change SECONDS can be zero or negative."
                  (time-subtract (org-time-string-to-time te)
                                 (org-time-string-to-time ts))))))
 
+(defun org-retroclock--next-heading-markers ()
+  "Return Org's clock markers at the heading after the entry at point.
+These are the markers of `org-clock-history', and those of the running,
+default and interrupted tasks."
+  (save-excursion
+    (when (outline-next-heading)
+      (let ((buffer (org-base-buffer (current-buffer)))
+            (here (point)))
+        (seq-filter (lambda (marker)
+                      (and (markerp marker)
+                           (eq (marker-buffer marker) buffer)
+                           (= marker here)))
+                    (append (list org-clock-hd-marker
+                                  org-clock-default-task
+                                  org-clock-interrupted-task)
+                            org-clock-history))))))
+
 (defun org-retroclock--insert (start end)
   "Insert a finished CLOCK line spanning START to END on the entry at point.
 START and END are Lisp timestamps.  Return the line's span and total."
@@ -86,7 +103,32 @@ START and END are Lisp timestamps.  Return the line's span and total."
     ;; A task clocked after the fact is a recent task all the same, as
     ;; `org-clock-in' makes it.
     (org-clock-history-push)
-    (org-clock-find-position nil)
+    (let ((running (and (eq (marker-buffer org-clock-hd-marker)
+                            (org-base-buffer (current-buffer)))
+                        (= (point) org-clock-hd-marker)))
+          (next (org-retroclock--next-heading-markers)))
+      (org-clock-find-position nil)
+      (save-excursion
+        ;; Org 9.6 opens a drawer at the next heading without moving the
+        ;; markers there onto the heading.
+        (when next
+          (org-back-to-heading t)
+          (outline-next-heading)
+          (dolist (marker next)
+            (move-marker marker (point) (marker-buffer marker))))
+        ;; Org gathers loose CLOCK lines into a drawer once there are
+        ;; enough of them, and the running clock's is one of them: its
+        ;; marker goes back after the open stamp, where `org-clock-in'
+        ;; put it.
+        (when running
+          (org-back-to-heading t)
+          (when (re-search-forward
+                 (concat "^[ \t]*" (regexp-quote org-clock-string)
+                         " \\[[^]\n]+\\][ \t]*$")
+                 (save-excursion (outline-next-heading) (point)) t)
+            (skip-chars-backward " \t")
+            (move-marker org-clock-marker (point)
+                         (org-base-buffer (current-buffer)))))))
     (pcase-let* ((`(,ts ,te ,seconds) (org-retroclock--stamps start end))
                  (hours (floor seconds 3600))
                  (minutes (floor (mod seconds 3600) 60)))

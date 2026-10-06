@@ -123,6 +123,55 @@
       (goto-char next)
       (should (looking-at-p "\\* Next")))))
 
+;; Org 9.6 opens the drawer at the next heading without moving the
+;; markers there, so the history, or a running clock's heading, would
+;; slip onto this entry's drawer.
+(ert-deftest org-retroclock-insert-leaves-the-next-heading-its-clock-markers ()
+  (org-retroclock-test--with-entry
+    (let ((next (save-excursion
+                  (goto-char (point-max))
+                  (insert "* Next\n")
+                  (copy-marker (line-beginning-position 0)))))
+      (push next org-clock-history)
+      (org-retroclock--insert org-retroclock-test--start org-retroclock-test--end)
+      (should (string-match-p ":LOGBOOK:" (buffer-string)))
+      (goto-char next)
+      (should (looking-at-p "\\* Next")))))
+
+;; Org gathers an entry's loose CLOCK lines into a drawer once there are
+;; enough of them, the running clock's own line among them.
+(ert-deftest org-retroclock-insert-keeps-the-running-clock-on-its-line ()
+  (org-retroclock-test--with-entry
+    (let ((org-clock-persist nil)
+          (org-clock-in-hook nil)
+          (org-clock-out-hook nil)
+          (org-clock-into-drawer 2)
+          (later (time-add org-retroclock-test--end (* 2 3600))))
+      (org-clock-in nil later)
+      (unwind-protect
+          (progn
+            (org-retroclock--insert org-retroclock-test--start org-retroclock-test--end)
+            (should (string-match-p ":LOGBOOK:" (buffer-string)))
+            ;; Where `org-clock-in' leaves it, and `org-clock-cancel' looks.
+            (goto-char org-clock-marker)
+            (should (looking-back (concat org-clock-string " \\[[^]\n]+\\]")
+                                  (line-beginning-position)))
+            (org-clock-out nil nil (time-add later 3600))
+            ;; Both closed, in whichever order the Org at hand puts them.
+            (should (equal (sort (progn (goto-char (point-min))
+                                        (cl-loop while (re-search-forward
+                                                        (concat "^[ \t]*" org-clock-string ".*$")
+                                                        nil t)
+                                                 collect (substring-no-properties
+                                                          (string-trim (match-string 0)))))
+                                 #'string<)
+                           '("CLOCK: [2026-09-24 Thu 09:00]--[2026-09-24 Thu 10:30] =>  1:30"
+                             "CLOCK: [2026-09-24 Thu 12:30]--[2026-09-24 Thu 13:30] =>  1:00"))))
+        (when (org-clocking-p)
+          (ignore-errors (org-clock-out nil t))
+          (move-marker org-clock-marker nil)
+          (move-marker org-clock-hd-marker nil))))))
+
 (ert-deftest org-retroclock-insert-pads-hours-past-ten ()
   (org-retroclock-test--with-entry
     (org-retroclock--insert org-retroclock-test--start

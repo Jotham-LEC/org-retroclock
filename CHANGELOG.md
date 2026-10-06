@@ -10,6 +10,16 @@ All notable changes to org-retroclock are documented here. The format is based o
 - `Package-Requires` names Org 9.6.6, the version Emacs 29.1 ships, so nothing new
   is installed; melpazoid asks an `org-` package to say it depends on Org.
 
+### Fixed
+- Logging on the entry whose clock is running no longer cuts that clock loose from its
+  line. When Org gathered the entry's loose `CLOCK:` lines into a drawer, as it does
+  once `org-clock-into-drawer` says there are enough of them, the running clock's
+  line moved without its marker: `org-clock-out` then failed with "Clock start time
+  is gone" on Org 9.6, and `org-clock-cancel` left the open line in the file.
+- On Org 9.6, a drawer opened at the next heading no longer drags that heading's
+  clock markers into it, so `org-retroclock-recent` no longer logs on the entry above
+  the one picked, and a running clock on the next heading keeps its heading.
+
 ## [0.2.0] — 2026-09-30
 
 ### Added
