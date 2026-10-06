@@ -4,6 +4,7 @@
 
 ;; Author: Jotham Lim Ee Chen <jotham@cothink.ing>
 ;; Assisted-by: Claude:claude-opus-5
+;; Assisted-by: Claude:claude-opus-5-5
 ;; URL: https://github.com/Jotham-LEC/org-retroclock
 ;; Version: 0.2.0
 ;; Package-Requires: ((emacs "29.1"))
