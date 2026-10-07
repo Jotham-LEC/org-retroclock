@@ -3,24 +3,14 @@
 [![CI](https://github.com/Jotham-LEC/org-retroclock/actions/workflows/ci.yml/badge.svg)](https://github.com/Jotham-LEC/org-retroclock/actions/workflows/ci.yml)
 [![License: GPL v3+](https://img.shields.io/badge/License-GPLv3%2B-blue.svg)](https://github.com/Jotham-LEC/org-retroclock/blob/main/LICENSE)
 
-org-retroclock records work you have already done as a finished Org clock
-entry. You say how long the work took, or when it started or ended, and it
-writes the `CLOCK:` line—start, end and total—where Org would have written
-it, without starting a clock.
+This package is designed for users who heavily uses org clock reports for timesheets. 
+
+Let's say you just completed a 30min tasks but forgot to log it. 
+By default, you had to start a new clock, end it, and modify the entry (or you may hand write the entire entry.)
+
+org-retroclock helps you quickly log your time **retrospectively**, with the current time as the end-time. You say how long the work took, or when it started or ended, and it writes the `CLOCK:` for you, all without starting a clock.
 
 ![Logging ninety minutes on an Org entry](images/demo.gif)
-
-Org measures time with a running clock: you clock in, work, and clock out
-(see [Clocking Commands](https://orgmode.org/manual/Clocking-commands.html)
-in The Org Manual). Work you finished without clocking in has no command of
-its own. `C-u C-u C-u C-c C-x C-i` only resumes from the last clock-out, and
-packages such as
-[org-clock-convenience](https://github.com/dfeich/org-clock-convenience)
-adjust `CLOCK:` lines that already exist. You can clock in, which clocks out
-whatever is running, then correct the start time and clock out at the right
-moment. Or you can open the drawer yourself, type both timestamps in Org's
-exact format where Org expects the line, and press `C-c C-c` to compute its
-total. org-retroclock does the same in one command.
 
 ## Installation
 
@@ -80,8 +70,7 @@ you give instead (see [Specifying the Span](#specifying-the-span)).
 
 Each command echoes the line it wrote and the entry it wrote it on, as in
 `Logged [2026-10-07 Wed 09:10]--[2026-10-07 Wed 10:40] => 1:30 on Write the
-quarterly report`. A task you log on joins `org-clock-history`, as one you
-clock in on does, so Org's task pickers offer it afterwards.
+quarterly report`. A task you log on joins `org-clock-history`, so Org's task pickers offer it afterwards.
 
 ## Durations
 
@@ -99,12 +88,10 @@ Any other duration Org understands is accepted too, and units may be in
 either case. The result is rounded to the nearest minute, since a `CLOCK:`
 line has no seconds.
 
-Note that a trailing `m` means minutes. Org's own duration syntax reads `m`
-as months, so that `90m` would be seven and a half years; no one logs a clock
-in months, so org-retroclock does not.
+NOTE: 
+- A trailing `m` means minutes. Default org's own duration syntax reads `m` as months, so that `90m` would be seven and a half years; I assume no one logs a clock in months, so org-retroclock uses minutes instead.
 
-A duration under one minute is refused, because its line would total `0:00`.
-A duration over one day is logged only after you confirm it.
+- A duration under one minute is refused, because its line would total `0:00`. A duration over one day is logged only after you confirm it.
 
 ## Specifying the Span
 
