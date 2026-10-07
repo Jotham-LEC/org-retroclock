@@ -6,6 +6,8 @@ All notable changes to org-retroclock are documented here. The format is based o
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-10-07
+
 ### Changed
 - `Package-Requires` names Org 9.6.6, the version Emacs 29.1 ships, so nothing new
   is installed; melpazoid asks an `org-` package to say it depends on Org.
@@ -103,7 +105,8 @@ in daily use.
 - **`org-retroclock-push-history`** (default `t`) decides whether a retroactive clock
   joins `org-clock-history` and so turns up in those pickers later.
 
-[Unreleased]: https://github.com/Jotham-LEC/org-retroclock/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/Jotham-LEC/org-retroclock/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/Jotham-LEC/org-retroclock/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Jotham-LEC/org-retroclock/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/Jotham-LEC/org-retroclock/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Jotham-LEC/org-retroclock/releases/tag/v0.1.0

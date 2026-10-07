@@ -6,7 +6,7 @@
 ;; Assisted-by: Claude:claude-opus-5
 ;; Assisted-by: Claude:claude-opus-5-5
 ;; URL: https://github.com/Jotham-LEC/org-retroclock
-;; Version: 0.2.0
+;; Version: 0.2.1
 ;; Package-Requires: ((emacs "29.1") (org "9.6.6"))
 ;; Keywords: outlines, calendar, convenience
 ;; SPDX-License-Identifier: GPL-3.0-or-later
